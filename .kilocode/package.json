@@ -1,0 +1,9 @@
+{
+  "name": "kilocode-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "0.6.0"
+  }
+}
