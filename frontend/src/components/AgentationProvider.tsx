@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
 import { ReactNode } from 'react';
-import agentation from 'agentation';
+import { Agentation } from 'agentation';
 
 // Типизация пропсов компонента
 interface AgentationProviderProps {
@@ -14,17 +13,16 @@ interface AgentationProviderProps {
  * Инициализируется только в development окружении
  */
 export const AgentationProvider = ({ children }: AgentationProviderProps) => {
-  useEffect(() => {
-    // Инициализируем Agentation только в development окружении
-    if (process.env.NODE_ENV === 'development') {
-      try {
-        agentation.init();
-      } catch (error) {
-        console.error('Ошибка при инициализации Agentation:', error);
-      }
-    }
-  }, []);
+  // В development режиме рендерим Agentation компонент
+  if (process.env.NODE_ENV === 'development') {
+    return (
+      <>
+        <Agentation />
+        {children}
+      </>
+    );
+  }
 
-  // Возвращаем children без дополнительной обёртки
+  // В production режиме возвращаем только children
   return <>{children}</>;
 };

@@ -18,11 +18,7 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className={inter.className}>
-        {process.env.NODE_ENV === 'development' ? (
-          <AgentationProvider>{children}</AgentationProvider>
-        ) : (
-          children
-        )}
+        <AgentationProvider>{children}</AgentationProvider>
       </body>
     </html>
   );
