@@ -1,0 +1,10 @@
+import { Agentation } from "agentation";
+
+function App() {
+  return (
+    <>
+      <YourApp />
+      {process.env.NODE_ENV === "development" && <Agentation />}
+    </>
+  );
+}

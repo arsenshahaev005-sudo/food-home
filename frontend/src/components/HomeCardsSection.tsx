@@ -39,10 +39,20 @@ export default function HomeCardsSection({
 
   const closeDish = useCallback(() => setOpen(false), []);
 
-  const discounted = useMemo(() => discountedDishes.filter((d) => d.discount_percentage > 0), [discountedDishes]);
+  // Проверка, что данные являются массивами
+  const safeCategories: Category[] = Array.isArray(categories) ? categories : [];
+  const safeRecommended: Dish[] = Array.isArray(recommended) ? recommended : [];
+  const safeDiscountedDishes: Dish[] = Array.isArray(discountedDishes) ? discountedDishes : [];
+  const safeSoonDishes: Dish[] = Array.isArray(soonDishes) ? soonDishes : [];
+  const safeCatPlaceholder: string[] = Array.isArray(catPlaceholder) ? catPlaceholder : [];
+
+  const isSoon = (d: Dish) => !d.is_available || Boolean(d.start_sales_at);
+
+  const discounted = useMemo(() => safeDiscountedDishes.filter((d) => d.discount_percentage > 0), [safeDiscountedDishes]);
   const soon = useMemo(() => {
-    return soonDishes.filter((d) => !d.is_available || Boolean(d.start_sales_at));
-  }, [soonDishes]);
+    return safeSoonDishes.filter((d) => isSoon(d));
+  }, [safeSoonDishes]);
+  const filteredRecommended: Dish[] = useMemo(() => safeRecommended.filter((d) => d.is_available && d.discount_percentage <= 0 && !isSoon(d)).slice(0, 7), [safeRecommended]);
 
   const getIcon = (name: string) => {
     const n = name.toLowerCase();
@@ -82,9 +92,9 @@ export default function HomeCardsSection({
       <section className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 bg-white rounded-2xl shadow-lg p-6 mb-4 pt-6">
         <div className="grid md:grid-cols-12 gap-8 items-start" style={{ ["--dish-card-h"]: "320px" } as CSSProperties}>
           <div className="md:col-span-6" style={{ ["--cat-gap"]: "0.75rem", ["--cat-btn-h"]: "calc((var(--dish-card-h) - 20px) / 2)" } as CSSProperties}>
-            <CategoriesMegaMenu categories={categories} placeholders={catPlaceholder} subcats={subcatsPlaceholder} />
+            <CategoriesMegaMenu categories={safeCategories} placeholders={safeCatPlaceholder} subcats={subcatsPlaceholder} />
             <div className="grid grid-cols-3 gap-5 mt-4">
-              {Array.isArray(categories) ? (categories.length >= 6 ? categories.slice(0, 6) : categories).map((c) => (
+              {Array.isArray(safeCategories) ? (safeCategories.length >= 6 ? safeCategories.slice(0, 6) : safeCategories).map((c) => (
                 <Link key={c.id} href={`/dishes?category=${c.id}`} className="group block">
                   <div
                     className="flex flex-col items-center justify-center gap-2 text-center"
@@ -97,8 +107,8 @@ export default function HomeCardsSection({
                   </div>
                 </Link>
               )) : null}
-              {(!categories || categories.length < 6) && Array.isArray(catPlaceholder) ?
-                catPlaceholder.slice(0, Math.max(0, 6 - (categories?.length || 0))).map((name, i) => (
+              {(!safeCategories || safeCategories.length < 6) && Array.isArray(safeCatPlaceholder) ?
+                safeCatPlaceholder.slice(0, Math.max(0, 6 - (safeCategories?.length || 0))).map((name, i) => (
                   <div key={`cph-${i}`} className="group block">
                     <div
                       className="flex flex-col items-center justify-center gap-2 text-center"
@@ -122,13 +132,13 @@ export default function HomeCardsSection({
               </Link>
             </div>
             <ul className="grid grid-cols-2 md:grid-cols-6 gap-5" style={{ transform: "translateX(-4px)" }}>
-              {recommended.slice(0, 2).map((d, index) => (
+              {filteredRecommended.slice(0, 2).map((d, index) => (
                 <li key={d.id} className="md:col-span-3">
                   <DishCard dish={d} onOpen={openDish} forceBuyButton={index === 0} />
                 </li>
               ))}
-              {recommended.length < 2 &&
-                recPlaceholderTop.slice(0, 2 - recommended.length).map((p, i) => (
+              {filteredRecommended.length < 2 &&
+                recPlaceholderTop.slice(0, 2 - filteredRecommended.length).map((p, i) => (
                   <li key={`ph-top-${i}`} className="md:col-span-3">
                     <DishCardPlaceholder name={p.name} price={p.price} />
                   </li>
@@ -138,12 +148,12 @@ export default function HomeCardsSection({
         </div>
 
         <ul className="grid grid-cols-2 md:grid-cols-4 gap-5 mt-6" style={{ ["--dish-card-h"]: "320px" } as CSSProperties}>
-          {recommended.slice(2).map((d) => (
+          {filteredRecommended.slice(2).map((d) => (
             <li key={d.id}>
               <DishCard dish={d} onOpen={openDish} />
             </li>
           ))}
-          {Array.from({ length: Math.max(0, 4 - recommended.slice(2).length) }).map((_, i) => {
+          {Array.from({ length: Math.max(0, 4 - filteredRecommended.slice(2).length) }).map((_, i) => {
             const p = recPlaceholderMore[i];
             return (
               <li key={`ph-row2-${i}`}>

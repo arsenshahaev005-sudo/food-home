@@ -1,4 +1,0 @@
-api/*.py:0:1: E902 OSError: [Errno 22] Invalid argument: 'api/*.py'
-core/*.py:0:1: E902 OSError: [Errno 22] Invalid argument: 'core/*.py'
-api/*.py:0:1: E902 OSError: [Errno 22] Invalid argument: 'api/*.py'
-core/*.py:0:1: E902 OSError: [Errno 22] Invalid argument: 'core/*.py'

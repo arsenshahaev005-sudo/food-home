@@ -12,8 +12,8 @@ export default async function Home() {
       getDishes({ is_archived: "false" }),
       getCategories({ only_roots: true }),
     ]);
-    dishes = res[0];
-    categories = res[1];
+    dishes = Array.isArray(res[0]) ? res[0] : [];
+    categories = Array.isArray(res[1]) ? res[1] : [];
   } catch {
     dishes = [];
     categories = [];

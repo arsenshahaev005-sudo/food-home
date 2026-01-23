@@ -20,7 +20,16 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_filters',
     'corsheaders',
+    # Keep old api app for backward compatibility during migration
     'api',
+    # New domain-based apps - TODO: Раскомментировать после миграции
+    # 'apps.users',  # Конфликт с auth.User - требует настройки AUTH_USER_MODEL
+    'apps.catalog',
+    'apps.orders',
+    'apps.producers',
+    'apps.cart',
+    'apps.payments',
+    'apps.gifts',
 ]
 
 MIDDLEWARE = [

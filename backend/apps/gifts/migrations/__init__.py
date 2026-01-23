@@ -1,0 +1,1 @@
+"""Gifts domain migrations."""

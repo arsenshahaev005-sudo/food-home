@@ -13,10 +13,13 @@ export default function CategoriesMegaMenu({ categories, placeholders, subcats }
   const subListRef = useRef<HTMLUListElement | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
 
+  // Проверка, что categories является массивом
+  const safeCategories: Category[] = Array.isArray(categories) ? categories : [];
+
   const all: Category[] = [
-    ...categories,
+    ...safeCategories,
     ...placeholders
-      .filter(p => !categories.some(c => c.name === p))
+      .filter(p => !safeCategories.some(c => c.name === p))
       .map((p, idx) => ({ id: `ph-${idx}`, name: p }))
   ];
 

@@ -1,0 +1,24 @@
+"""Domain applications package.
+
+This package contains all domain-specific Django applications organized by business domain.
+Each app is self-contained with its own models, views, serializers, and business logic.
+"""
+
+# Export all domain app configs for easy importing
+from apps.users.apps import UsersConfig
+from apps.catalog.apps import CatalogConfig
+from apps.orders.apps import OrdersConfig
+from apps.producers.apps import ProducersConfig
+from apps.cart.apps import CartConfig
+from apps.payments.apps import PaymentsConfig
+from apps.gifts.apps import GiftsConfig
+
+__all__ = [
+    'UsersConfig',
+    'CatalogConfig',
+    'OrdersConfig',
+    'ProducersConfig',
+    'CartConfig',
+    'PaymentsConfig',
+    'GiftsConfig',
+]
