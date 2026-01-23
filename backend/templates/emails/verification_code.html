@@ -1,0 +1,10 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<p style="font-size: 16px;">Hello,</p>
+<p style="font-size: 16px;">Your verification code is:</p>
+<div style="text-align: center; margin: 30px 0;">
+    <span style="font-size: 32px; font-weight: bold; color: #c9825b; letter-spacing: 5px; background: #fffaf5; padding: 10px 20px; border-radius: 8px;">{{ code }}</span>
+</div>
+<p style="font-size: 14px; color: #666;">If you didn't request this code, please ignore this email.</p>
+{% endblock %}

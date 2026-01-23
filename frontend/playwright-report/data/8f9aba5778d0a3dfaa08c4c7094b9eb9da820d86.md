@@ -1,0 +1,503 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Food&Home" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "Food&Home" [ref=e6]
+        - generic [ref=e10]:
+          - img [ref=e11]
+          - searchbox "Поиск блюд..." [ref=e14]
+        - navigation [ref=e15]:
+          - button "Выбрать адрес" [ref=e17] [cursor=pointer]
+          - link "Перейти в корзину" [ref=e19] [cursor=pointer]:
+            - /url: /cart
+            - img [ref=e20]
+          - generic [ref=e24]:
+            - button [ref=e25] [cursor=pointer]:
+              - img [ref=e26]
+            - menu:
+              - link "Войти":
+                - /url: /auth/login
+              - link "Регистрация":
+                - /url: /auth/register
+    - main [ref=e30]:
+      - main [ref=e31]:
+        - region "Домашняя еда от лучших поваров вашего города" [ref=e32]:
+          - generic [ref=e37]:
+            - generic [ref=e38]:
+              - heading "Домашняя еда от лучших поваров вашего города" [level=1] [ref=e39]
+              - paragraph [ref=e40]: Закажите свежие домашние блюда с доставкой
+              - paragraph [ref=e41]: Откройте для себя вкус домашней еды, приготовленной с любовью нашими талантливыми поварами. Быстрая доставка, свежие ингредиенты и неповторимый вкус.
+              - generic [ref=e42]:
+                - link "Перейти в каталог" [ref=e43] [cursor=pointer]:
+                  - /url: /dishes
+                - link "Узнать больше" [ref=e44] [cursor=pointer]:
+                  - /url: /categories
+              - generic [ref=e45]:
+                - generic [ref=e46]:
+                  - img [ref=e47]
+                  - generic [ref=e50]: Свежие продукты
+                - generic [ref=e51]:
+                  - img [ref=e52]
+                  - generic [ref=e55]: Быстрая доставка
+                - generic [ref=e56]:
+                  - img [ref=e57]
+                  - generic [ref=e59]: С любовью
+            - generic [ref=e63]:
+              - img "Домашняя еда" [ref=e65]
+              - generic [ref=e66]:
+                - generic [ref=e67]: 500+
+                - generic [ref=e68]: Блюд
+        - generic [ref=e70]:
+          - generic [ref=e72]:
+            - heading "Подборки для вас" [level=2] [ref=e73]
+            - paragraph [ref=e74]: Вдохновляйтесь нашими тематическими сетами
+          - generic [ref=e75]:
+            - link "Уютный ужин Домашнее тепло в каждой тарелке Уютный ужин" [ref=e76] [cursor=pointer]:
+              - /url: /dishes?collection=cozy-dinner
+              - generic [ref=e77]:
+                - heading "Уютный ужин" [level=3] [ref=e78]
+                - paragraph [ref=e79]: Домашнее тепло в каждой тарелке
+              - img "Уютный ужин" [ref=e81]
+              - img [ref=e84]
+            - link "Здоровый старт Зарядитесь энергией на весь день Здоровый старт" [ref=e86] [cursor=pointer]:
+              - /url: /dishes?collection=healthy-start
+              - generic [ref=e87]:
+                - heading "Здоровый старт" [level=3] [ref=e88]
+                - paragraph [ref=e89]: Зарядитесь энергией на весь день
+              - img "Здоровый старт" [ref=e91]
+              - img [ref=e94]
+            - link "Праздничный стол Сделайте ваш праздник особенным Праздничный стол" [ref=e96] [cursor=pointer]:
+              - /url: /dishes?collection=festive-table
+              - generic [ref=e97]:
+                - heading "Праздничный стол" [level=3] [ref=e98]
+                - paragraph [ref=e99]: Сделайте ваш праздник особенным
+              - img "Праздничный стол" [ref=e101]
+              - img [ref=e104]
+            - link "Уют для дома Пледы, свечи и декор для тепла Уют для дома" [ref=e106] [cursor=pointer]:
+              - /url: /dishes?collection=cozy-home
+              - generic [ref=e107]:
+                - heading "Уют для дома" [level=3] [ref=e108]
+                - paragraph [ref=e109]: Пледы, свечи и декор для тепла
+              - img "Уют для дома" [ref=e111]
+              - img [ref=e114]
+        - generic [ref=e116]:
+          - generic [ref=e117]:
+            - generic [ref=e118]:
+              - generic [ref=e119]:
+                - generic [ref=e120]:
+                  - heading "Категории" [level=2] [ref=e121]
+                  - button "Показать все" [ref=e122] [cursor=pointer]
+                - generic:
+                  - generic:
+                    - complementary:
+                      - generic:
+                        - generic: Категории
+                        - button:
+                          - img
+                      - menu "Список категорий":
+                        - listitem:
+                          - button "🥐 Выпечка" [pressed]:
+                            - generic: 🥐
+                            - generic: Выпечка
+                        - listitem:
+                          - button "🍴 Горячие блюда":
+                            - generic: 🍴
+                            - generic: Горячие блюда
+                        - listitem:
+                          - button "🍳 Завтраки":
+                            - generic: 🍳
+                            - generic: Завтраки
+                        - listitem:
+                          - button "🥗 Закуски и салаты":
+                            - generic: 🥗
+                            - generic: Закуски и салаты
+                        - listitem:
+                          - button "🥤 Напитки":
+                            - generic: 🥤
+                            - generic: Напитки
+                        - listitem:
+                          - button "🍴 Замороженные продукты":
+                            - generic: 🍴
+                            - generic: Замороженные продукты
+                        - listitem:
+                          - button "🍯 Консервация и заготовки":
+                            - generic: 🍯
+                            - generic: Консервация и заготовки
+                        - listitem:
+                          - button "🎁 Подарочные наборы":
+                            - generic: 🎁
+                            - generic: Подарочные наборы
+                        - listitem:
+                          - button "🏠 Уют и дом":
+                            - generic: 🏠
+                            - generic: Уют и дом
+                        - listitem:
+                          - button "✨ Красота и уход":
+                            - generic: ✨
+                            - generic: Красота и уход
+                        - listitem:
+                          - button "🧣 Одежда и аксессуары":
+                            - generic: 🧣
+                            - generic: Одежда и аксессуары
+                        - listitem:
+                          - button "🎨 Хобби и творчество":
+                            - generic: 🎨
+                            - generic: Хобби и творчество
+                        - listitem:
+                          - button "🏠 Для домашних животных":
+                            - generic: 🏠
+                            - generic: Для домашних животных
+                        - listitem:
+                          - button "👶 Детское меню":
+                            - generic: 👶
+                            - generic: Детское меню
+                        - listitem:
+                          - button "🌱 Веган и ПП":
+                            - generic: 🌱
+                            - generic: Веган и ПП
+                    - generic:
+                      - generic: Подкатегории
+                      - list:
+                        - listitem:
+                          - link "Хлеб и багеты":
+                            - /url: /dishes?category=66f6d56c-59c4-4e15-9f32-313c518ba49c
+                        - listitem:
+                          - link "Булочки и круассаны":
+                            - /url: /dishes?category=47fca625-5263-4fdd-90b6-cecdb1fd3a6f
+                        - listitem:
+                          - link "Пироги и киши":
+                            - /url: /dishes?category=b6e1a729-9d91-47b3-adca-d6be8a3e51f5
+                        - listitem:
+                          - link "Торты на заказ":
+                            - /url: /dishes?category=2905ddb8-1c6e-4c80-903f-c267f8abf678
+                        - listitem:
+                          - link "Десерты и пирожные":
+                            - /url: /dishes?category=47968cec-c6a6-4fdb-bd0c-636e32d6e958
+                        - listitem:
+                          - link "Печенье и пряники":
+                            - /url: /dishes?category=b4f356ba-4e6a-4b46-aa8f-0dc63452b9d4
+                        - listitem:
+                          - link "Кексы и маффины":
+                            - /url: /dishes?category=9c57a85f-b6e4-4d7f-809b-fb552958e332
+                        - listitem:
+                          - link "Блины и оладьи":
+                            - /url: /dishes?category=e0f8a19c-814f-4c02-bb70-b271b81fa8ea
+                        - listitem:
+                          - link "Сырники":
+                            - /url: /dishes?category=e03db5e6-41b1-4424-8c64-d01f00d0fd12
+                        - listitem:
+                          - link "Пахлава и восточные сладости":
+                            - /url: /dishes?category=fb05c545-69b1-4081-baaf-10a4017764d3
+              - generic [ref=e123]:
+                - link "🥐 Выпечка" [ref=e124] [cursor=pointer]:
+                  - /url: /dishes?category=7a99f9e1-b1e3-4c2f-a236-2731bd9f669c
+                  - generic [ref=e125]:
+                    - generic [ref=e126]: 🥐
+                    - generic [ref=e127]: Выпечка
+                - link "🥘 Горячие блюда" [ref=e128] [cursor=pointer]:
+                  - /url: /dishes?category=ade3a9cc-9682-4d19-bd0b-2e34359db223
+                  - generic [ref=e129]:
+                    - generic [ref=e130]: 🥘
+                    - generic [ref=e131]: Горячие блюда
+                - link "🍳 Завтраки" [ref=e132] [cursor=pointer]:
+                  - /url: /dishes?category=4a04aa0f-96c6-4f5d-91bc-7164222ef50b
+                  - generic [ref=e133]:
+                    - generic [ref=e134]: 🍳
+                    - generic [ref=e135]: Завтраки
+                - link "🍟 Закуски и салаты" [ref=e136] [cursor=pointer]:
+                  - /url: /dishes?category=0bb8695e-ad71-44ef-801c-c2f6d3de8275
+                  - generic [ref=e137]:
+                    - generic [ref=e138]: 🍟
+                    - generic [ref=e139]: Закуски и салаты
+                - link "🍹 Напитки" [ref=e140] [cursor=pointer]:
+                  - /url: /dishes?category=869879b5-75fd-4975-9d32-7a93c159413b
+                  - generic [ref=e141]:
+                    - generic [ref=e142]: 🍹
+                    - generic [ref=e143]: Напитки
+                - link "❄️ Замороженные продукты" [ref=e144] [cursor=pointer]:
+                  - /url: /dishes?category=49647ecf-7eed-4bbb-a876-d1b0c2d4a978
+                  - generic [ref=e145]:
+                    - generic [ref=e146]: ❄️
+                    - generic [ref=e147]: Замороженные продукты
+            - generic [ref=e148]:
+              - generic [ref=e149]:
+                - heading "Рекомендованные блюда" [level=2] [ref=e150]
+                - link "Все блюда" [ref=e151] [cursor=pointer]:
+                  - /url: /dishes?section=recommended
+              - list [ref=e152]:
+                - listitem [ref=e153]:
+                  - button "Открыть Круасан" [ref=e154] [cursor=pointer]:
+                    - generic [ref=e155]:
+                      - img "Круасан" [ref=e156]
+                      - button "Добавить в избранное" [ref=e157]:
+                        - img [ref=e158]
+                    - generic [ref=e160]:
+                      - generic [ref=e161]: Круасан
+                      - generic [ref=e163]:
+                        - generic [ref=e164]:
+                          - img [ref=e165]
+                          - generic [ref=e167]: "0.0"
+                        - generic [ref=e168]: 7 тыс.
+                      - button "Добавить в корзину" [ref=e170]:
+                        - generic [ref=e171]: 100 ₽
+                        - generic [ref=e172]: Купить
+                - listitem [ref=e173]:
+                  - button "Открыть круассан" [ref=e174] [cursor=pointer]:
+                    - generic [ref=e175]:
+                      - img "круассан" [ref=e176]
+                      - button "Добавить в избранное" [ref=e177]:
+                        - img [ref=e178]
+                    - generic [ref=e180]:
+                      - generic [ref=e181]: круассан
+                      - generic [ref=e183]:
+                        - generic [ref=e184]:
+                          - img [ref=e185]
+                          - generic [ref=e187]: "0.0"
+                        - generic [ref=e188]: 7 тыс.
+                      - button "Добавить в корзину" [ref=e190]:
+                        - generic [ref=e191]: 200 ₽
+                        - generic [ref=e192]: Купить
+          - list [ref=e193]:
+            - listitem [ref=e194]:
+              - button "Открыть круасан" [ref=e195] [cursor=pointer]:
+                - generic [ref=e196]:
+                  - img "круасан" [ref=e197]
+                  - button "Добавить в избранное" [ref=e198]:
+                    - img [ref=e199]
+                - generic [ref=e201]:
+                  - generic [ref=e202]: круасан
+                  - generic [ref=e204]:
+                    - generic [ref=e205]:
+                      - img [ref=e206]
+                      - generic [ref=e208]: "0.0"
+                    - generic [ref=e209]: 7 тыс.
+                  - button "Добавить в корзину" [ref=e211]:
+                    - generic [ref=e212]: 900 ₽
+                    - generic [ref=e213]: Купить
+            - listitem [ref=e214]:
+              - button "Открыть лого" [ref=e215] [cursor=pointer]:
+                - generic [ref=e216]:
+                  - img "лого" [ref=e217]
+                  - button "Добавить в избранное" [ref=e218]:
+                    - img [ref=e219]
+                - generic [ref=e221]:
+                  - generic [ref=e222]: лого
+                  - generic [ref=e224]:
+                    - generic [ref=e225]:
+                      - img [ref=e226]
+                      - generic [ref=e228]: "0.0"
+                    - generic [ref=e229]: 7 тыс.
+                  - button "Добавить в корзину" [ref=e231]:
+                    - generic [ref=e232]: 88 ₽
+                    - generic [ref=e233]: Купить
+            - listitem [ref=e234]:
+              - button "Открыть да" [ref=e235] [cursor=pointer]:
+                - generic [ref=e236]:
+                  - img "да" [ref=e237]
+                  - button "Добавить в избранное" [ref=e238]:
+                    - img [ref=e239]
+                - generic [ref=e241]:
+                  - generic [ref=e242]: да
+                  - generic [ref=e244]:
+                    - generic [ref=e245]:
+                      - img [ref=e246]
+                      - generic [ref=e248]: "0.0"
+                    - generic [ref=e249]: 7 тыс.
+                  - button "Добавить в корзину" [ref=e251]:
+                    - generic [ref=e252]: 0 ₽
+                    - generic [ref=e253]: Купить
+            - listitem [ref=e254]:
+              - generic [ref=e258]:
+                - generic [ref=e259]: Плов
+                - generic [ref=e260]:
+                  - generic [ref=e261]:
+                    - img [ref=e262]
+                    - generic [ref=e264]: "4.96"
+                  - generic [ref=e265]: 7 тыс.
+                - button "$13 Купить" [disabled] [ref=e267]:
+                  - generic [ref=e268]: $13
+                  - generic [ref=e269]: Купить
+          - generic [ref=e270]:
+            - generic [ref=e271]:
+              - heading "Скоро" [level=2] [ref=e272]
+              - link "Все блюда" [ref=e273] [cursor=pointer]:
+                - /url: /dishes?section=soon
+            - list [ref=e274]:
+              - listitem [ref=e275]:
+                - button "Открыть увв" [ref=e276] [cursor=pointer]:
+                  - generic [ref=e277]:
+                    - img "увв" [ref=e278]
+                    - generic [ref=e279]: −100%
+                    - generic [ref=e280]: Скоро
+                    - button "Добавить в избранное" [ref=e281]:
+                      - img [ref=e282]
+                  - generic [ref=e284]:
+                    - generic [ref=e285]: увв
+                    - generic [ref=e287]:
+                      - generic [ref=e288]:
+                        - img [ref=e289]
+                        - generic [ref=e291]: "0.0"
+                      - generic [ref=e292]: 7 тыс.
+                    - button "Добавить в корзину" [ref=e294]:
+                      - generic [ref=e295]: 0 ₽
+                      - generic [ref=e296]: Купить
+              - listitem [ref=e297]:
+                - button "Открыть лыпстык" [ref=e298] [cursor=pointer]:
+                  - generic [ref=e299]:
+                    - img "лыпстык" [ref=e300]
+                    - generic [ref=e301]: Скоро
+                    - button "Добавить в избранное" [ref=e302]:
+                      - img [ref=e303]
+                  - generic [ref=e305]:
+                    - generic [ref=e306]: лыпстык
+                    - generic [ref=e308]:
+                      - generic [ref=e309]:
+                        - img [ref=e310]
+                        - generic [ref=e312]: "0.0"
+                      - generic [ref=e313]: 7 тыс.
+                    - button "Добавить в корзину" [ref=e315]:
+                      - generic [ref=e316]: 677 ₽
+                      - generic [ref=e317]: Купить
+          - generic [ref=e318]:
+            - generic [ref=e319]:
+              - heading "Скидки и акции" [level=2] [ref=e320]
+              - link "Все предложения" [ref=e321] [cursor=pointer]:
+                - /url: /dishes?section=discounts
+            - list [ref=e322]:
+              - listitem [ref=e323]:
+                - button "Открыть кузбас" [ref=e324] [cursor=pointer]:
+                  - generic [ref=e325]:
+                    - img "кузбас" [ref=e326]
+                    - generic [ref=e327]: −19%
+                    - button "Добавить в избранное" [ref=e328]:
+                      - img [ref=e329]
+                  - generic [ref=e331]:
+                    - generic [ref=e332]: кузбас
+                    - generic [ref=e334]:
+                      - generic [ref=e335]:
+                        - img [ref=e336]
+                        - generic [ref=e338]: "0.0"
+                      - generic [ref=e339]: 7 тыс.
+                    - button "Добавить в корзину" [ref=e341]:
+                      - generic [ref=e342]: 729 ₽
+                      - generic [ref=e343]: Купить
+              - listitem [ref=e344]:
+                - button "Открыть народное ополчение" [ref=e345] [cursor=pointer]:
+                  - generic [ref=e346]:
+                    - img "народное ополчение" [ref=e347]
+                    - generic [ref=e348]: −89%
+                    - button "Добавить в избранное" [ref=e349]:
+                      - img [ref=e350]
+                  - generic [ref=e352]:
+                    - generic [ref=e353]: народное ополчение
+                    - generic [ref=e355]:
+                      - generic [ref=e356]:
+                        - img [ref=e357]
+                        - generic [ref=e359]: "0.0"
+                      - generic [ref=e360]: 7 тыс.
+                    - button "Добавить в корзину" [ref=e362]:
+                      - generic [ref=e363]: 1000 ₽
+                      - generic [ref=e364]: Купить
+              - listitem [ref=e365]:
+                - button "Открыть глаз демогоргона" [ref=e366] [cursor=pointer]:
+                  - generic [ref=e367]:
+                    - img "глаз демогоргона" [ref=e368]
+                    - generic [ref=e369]: −98%
+                    - button "Добавить в избранное" [ref=e370]:
+                      - img [ref=e371]
+                  - generic [ref=e373]:
+                    - generic [ref=e374]: глаз демогоргона
+                    - generic [ref=e376]:
+                      - generic [ref=e377]:
+                        - img [ref=e378]
+                        - generic [ref=e380]: "0.0"
+                      - generic [ref=e381]: 7 тыс.
+                    - button "Добавить в корзину" [ref=e383]:
+                      - generic [ref=e384]: 1975 ₽
+                      - generic [ref=e385]: Купить
+        - region "Что говорят наши клиенты" [ref=e386]:
+          - generic [ref=e387]:
+            - generic [ref=e388]:
+              - heading "Что говорят наши клиенты" [level=2] [ref=e389]
+              - paragraph [ref=e390]: Отзывы реальных людей, которые уже попробовали нашу домашнюю еду
+            - generic [ref=e391]:
+              - article [ref=e392]:
+                - generic [ref=e393]:
+                  - img "Анна Петрова" [ref=e395]
+                  - generic [ref=e396]:
+                    - heading "Анна Петрова" [level=3] [ref=e397]
+                    - generic [ref=e398]:
+                      - generic [ref=e399]:
+                        - img [ref=e400]
+                        - img [ref=e402]
+                        - img [ref=e404]
+                        - img [ref=e406]
+                        - img [ref=e408]
+                      - generic [ref=e410]: 2 дня назад
+                - paragraph [ref=e411]: Вкуснейшая домашняя еда! Заказывала борщ и котлеты, всё было свежее и горячее. Доставка приехала вовремя.
+                - generic [ref=e413]:
+                  - img "Борщ с пампушками" [ref=e415]
+                  - generic [ref=e416]:
+                    - paragraph [ref=e417]: "Заказывал(а):"
+                    - paragraph [ref=e418]: Борщ с пампушками
+              - article [ref=e419]:
+                - generic [ref=e420]:
+                  - img "Михаил Иванов" [ref=e422]
+                  - generic [ref=e423]:
+                    - heading "Михаил Иванов" [level=3] [ref=e424]
+                    - generic [ref=e425]:
+                      - generic [ref=e426]:
+                        - img [ref=e427]
+                        - img [ref=e429]
+                        - img [ref=e431]
+                        - img [ref=e433]
+                        - img [ref=e435]
+                      - generic [ref=e437]: 5 дней назад
+                - paragraph [ref=e438]: Отличный сервис и качество еды. Повара настоящие профессионалы! Буду заказывать ещё.
+                - generic [ref=e440]:
+                  - img "Пельмени домашние" [ref=e442]
+                  - generic [ref=e443]:
+                    - paragraph [ref=e444]: "Заказывал(а):"
+                    - paragraph [ref=e445]: Пельмени домашние
+              - article [ref=e446]:
+                - generic [ref=e447]:
+                  - img "Елена Смирнова" [ref=e449]
+                  - generic [ref=e450]:
+                    - heading "Елена Смирнова" [level=3] [ref=e451]
+                    - generic [ref=e452]:
+                      - generic [ref=e453]:
+                        - img [ref=e454]
+                        - img [ref=e456]
+                        - img [ref=e458]
+                        - img [ref=e460]
+                        - img [ref=e462]
+                      - generic [ref=e464]: 1 неделю назад
+                - paragraph [ref=e465]: Очень вкусно и быстро. Единственный минус - не хватило соуса, но в целом всё супер!
+                - generic [ref=e467]:
+                  - img "Плов узбекский" [ref=e469]
+                  - generic [ref=e470]:
+                    - paragraph [ref=e471]: "Заказывал(а):"
+                    - paragraph [ref=e472]: Плов узбекский
+            - button "Оставить отзыв" [ref=e474] [cursor=pointer]
+            - generic [ref=e475]:
+              - generic [ref=e476]:
+                - generic [ref=e477]: "4.9"
+                - generic [ref=e478]: Средний рейтинг
+              - generic [ref=e479]:
+                - generic [ref=e480]: 2000+
+                - generic [ref=e481]: Отзывов
+              - generic [ref=e482]:
+                - generic [ref=e483]: 95%
+                - generic [ref=e484]: Довольных клиентов
+              - generic [ref=e485]:
+                - generic [ref=e486]: 150+
+                - generic [ref=e487]: Поваров
+    - contentinfo [ref=e488]:
+      - paragraph [ref=e490]: © 2024 Food Home. Все права защищены.
+  - alert [ref=e491]
+```

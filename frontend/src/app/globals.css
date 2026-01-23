@@ -1,0 +1,218 @@
+@import "tailwindcss";
+@import '../styles/responsive.css';
+
+:root {
+  --background: #E8DDD2;
+  --foreground: #4b2f23;
+  --text-secondary: #7c6b62;
+  --accent: #CD845B;
+  --accent-2: #CD845B;
+  --muted: #efe3d6;
+  --card: #fcf8f3;
+  --border-warm: #e8dccf;
+  --shadow-color: rgba(205, 132, 91, 0.25);
+  --shadow-soft: 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06);
+  --radius-card: 24px;
+  
+  /* Fallback values for better browser compatibility */
+  --background-fallback: rgb(232, 221, 210);
+  --foreground-fallback: rgb(75, 47, 35);
+  --text-secondary-fallback: rgb(124, 107, 98);
+  --accent-fallback: rgb(205, 132, 91);
+  --muted-fallback: rgb(239, 227, 214);
+  --card-fallback: rgb(252, 248, 243);
+  --border-warm-fallback: rgb(232, 220, 207);
+}
+
+.btn-warm {
+  background-color: rgb(252, 248, 243);
+  background-color: var(--card, #fcf8f3);
+  background-color: var(--card-fallback, rgb(252, 248, 243));
+  color: rgb(75, 47, 35);
+  color: var(--foreground, #4b2f23);
+  color: var(--foreground-fallback, rgb(75, 47, 35));
+  border-radius: 9999px;
+  box-shadow: 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06);
+  box-shadow: var(--shadow-soft, 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 14px;
+  font-size: 14px;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+.btn-warm:hover {
+  background-color: #CD845B !important;
+  color: #FFFFFF !important;
+  border-color: #CD845B !important;
+  transform: none;
+  box-shadow: 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06);
+  box-shadow: var(--shadow-soft, 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06));
+}
+
+.btn-cart:hover {
+  background-color: #CD845B;
+  color: #FFFFFF;
+}
+
+/* removed @theme inline to satisfy CSS diagnostics */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #E8DDD2;
+    --foreground: #4b2f23;
+    --text-secondary: #7c6b62;
+    --accent: #c9825b;
+    --accent-2: #b46a45;
+    --muted: #efe3d6;
+    --card: #fcf8f3;
+    --border-warm: #e8dccf;
+    --shadow-color: rgba(185, 135, 90, 0.25);
+  }
+}
+
+body {
+  background: rgb(232, 221, 210);
+  background: var(--background, #E8DDD2);
+  background: var(--background-fallback, rgb(232, 221, 210));
+  color: rgb(75, 47, 35);
+  color: var(--foreground, #4b2f23);
+  color: var(--foreground-fallback, rgb(75, 47, 35));
+  font-family: var(--font-sans), system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+}
+
+h1, h2, h3 {
+  font-family: Georgia, serif;
+  font-family: var(--font-heading, Georgia, serif);
+}
+
+button {
+  background: #fcf8f3;
+  background: var(--card, #fcf8f3);
+  color: #4b2f23;
+  color: var(--foreground, #4b2f23);
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  padding: 0.6rem 1rem;
+  box-shadow: 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06);
+  box-shadow: var(--shadow-soft, 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06));
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+button:hover {
+  /* No transform */
+}
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.card,
+.bg-card {
+  background: #fcf8f3;
+  background: var(--card, #fcf8f3);
+  border: 1px solid #e8dccf;
+  border: 1px solid var(--border-warm, #e8dccf);
+  border-radius: 24px;
+  border-radius: var(--radius-card, 24px);
+  box-shadow: 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06);
+  box-shadow: var(--shadow-soft, 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06));
+}
+
+@keyframes warmFadeIn {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes warmFadeOut {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(4px); }
+}
+
+@keyframes warmZoomIn {
+  0% { opacity: 0; transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes warmZoomOut {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.98); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}
+
+.price-wrap { position: relative; height: 40px; width: 100%; }
+.price-pill { background: #ffffff; color: #4b2f23; color: var(--foreground, #4b2f23); border: 1px solid #e8dccf; border: 1px solid var(--border-warm, #e8dccf); border-radius: 9999px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; height: 40px; min-width: 100px; box-shadow: 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06); box-shadow: var(--shadow-soft, 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06)); }
+.buy-btn { display: inline-flex; align-items: center; justify-content: center; }
+.card-buy-fixed { position: absolute; right: 16px; bottom: 12px; }
+.buy-btn button { min-width: 110px; height: 40px; padding: 0 16px; font-size: 14px; }
+.buy-btn button:hover { background-color: #CD845B !important; color: #FFFFFF !important; border-color: #CD845B !important; opacity: 1 !important; }
+.card-buy-btn { all: unset; display: inline-flex; align-items: center; justify-content: center; background: #ffffff; color: #4b2f23; color: var(--foreground, #4b2f23); border: 1px solid #e8dccf; border: 1px solid var(--border-warm, #e8dccf); border-radius: 9999px; height: 40px; min-width: 110px; padding: 0 16px; box-shadow: 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06); box-shadow: var(--shadow-soft, 0 8px 28px rgba(205, 132, 91, 0.25), 0 2px 8px rgba(75, 47, 35, 0.06)); cursor: pointer; position: relative; overflow: hidden; transition: color 180ms ease; }
+.card-buy-btn:hover { background: #CD845B; color: #FFFFFF; border-color: #CD845B; opacity: 1; }
+.card-buy-btn:disabled { background: #ffffff; color: #4b2f23; color: var(--foreground, #4b2f23); border-color: #e8dccf; border-color: var(--border-warm, #e8dccf); opacity: 1; }
+.btn-warm.btn-toggle:hover { background: #CD845B !important; color: #FFFFFF !important; border-color: #CD845B !important; opacity: 1 !important; }
+
+.btn-toggle { position: relative; overflow: hidden; }
+.btn-toggle .btn-price, .btn-toggle .btn-buy { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); transition: opacity 180ms ease, transform 180ms ease; white-space: nowrap; }
+.btn-toggle .btn-buy { opacity: 0; }
+.btn-toggle:hover .btn-buy { opacity: 1; }
+.btn-toggle:hover .btn-price { opacity: 0; }
+.btn-toggle:hover { background-color: #CD845B !important; color: #FFFFFF !important; border-color: #CD845B !important; opacity: 1 !important; }
+.card-buy-fixed .btn-warm:hover,
+.card-buy-fixed .btn-toggle:hover,
+.buy-btn .btn-warm:hover,
+.buy-btn .btn-toggle:hover {
+  background-color: #CD845B !important;
+  color: #FFFFFF !important;
+  border-color: #CD845B !important;
+  opacity: 1 !important;
+}
+.title-clamp { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; font-size: clamp(0.8rem, 1.6vw, 0.9rem); line-height: 1.2; }
+
+body.modal-open header {
+  display: none !important;
+}
+
+/* Phone Input Customization */
+.phone-input-custom .PhoneInputInput {
+  background-color: transparent;
+  border: none;
+  outline: none;
+  height: 100%;
+  color: #4b2f23;
+  color: var(--foreground, #4b2f23);
+  font-size: 0.875rem;
+}
+.phone-input-custom .PhoneInputCountry {
+  margin-right: 0.75rem;
+}
+.phone-input-custom .PhoneInputCountrySelect {
+  background-color: #fcf8f3;
+  background-color: var(--card, #fcf8f3);
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e8dccf;
+  background: var(--border-warm, #e8dccf);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #CD845B;
+  background: var(--accent, #CD845B);
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #e8dccf transparent;
+  scrollbar-color: var(--border-warm, #e8dccf) transparent;
+}

@@ -1,0 +1,129 @@
+[
+  {
+    "path": "/",
+    "name": "Главная страница",
+    "viewports": {
+      "desktop": {
+        "viewportWidth": 1920,
+        "hasMain": true,
+        "mainClasses": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8",
+        "hasContainerClass": true,
+        "hasContainerInMain": true,
+        "mainWidth": 1280,
+        "contentWidthRatio": 0.6666666666666666,
+        "elementsWithoutContainer": [],
+        "domStructure": "<main class=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8\"><main class=\"mx-auto max-w-6xl px-4 py-10 space-y-12\"><section class=\"relative min-h-[600px] flex items-center justify-center bg-gradient-to-br from-orange-50 to-white overflow-hidden\" aria-labelledby=\"hero-title\"><div class=\"absolute inset-0 opacity-10\"><div class=\"absolute top-20 left-20 w-72 h-72 bg-orange-400 rounded-full blur-3xl\" style=\"background-color:#CD845B\"></div><div class=\"absolute bottom-20 right-20 w-96 h-96 bg-orange-300 r",
+        "containerClasses": "mx-auto max-w-6xl px-4 py-10 space-y-12"
+      },
+      "tablet": {
+        "viewportWidth": 768,
+        "hasMain": true,
+        "mainClasses": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8",
+        "hasContainerClass": true,
+        "hasContainerInMain": true,
+        "mainWidth": 768,
+        "contentWidthRatio": 1,
+        "elementsWithoutContainer": [],
+        "domStructure": "<main class=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8\"><main class=\"mx-auto max-w-6xl px-4 py-10 space-y-12\"><section class=\"relative min-h-[600px] flex items-center justify-center bg-gradient-to-br from-orange-50 to-white overflow-hidden\" aria-labelledby=\"hero-title\"><div class=\"absolute inset-0 opacity-10\"><div class=\"absolute top-20 left-20 w-72 h-72 bg-orange-400 rounded-full blur-3xl\" style=\"background-color:#CD845B\"></div><div class=\"absolute bottom-20 right-20 w-96 h-96 bg-orange-300 r",
+        "containerClasses": "mx-auto max-w-6xl px-4 py-10 space-y-12"
+      },
+      "mobile": {
+        "viewportWidth": 375,
+        "hasMain": true,
+        "mainClasses": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8",
+        "hasContainerClass": true,
+        "hasContainerInMain": true,
+        "mainWidth": 375,
+        "contentWidthRatio": 1,
+        "elementsWithoutContainer": [],
+        "domStructure": "<main class=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8\"><main class=\"mx-auto max-w-6xl px-4 py-10 space-y-12\"><section class=\"relative min-h-[600px] flex items-center justify-center bg-gradient-to-br from-orange-50 to-white overflow-hidden\" aria-labelledby=\"hero-title\"><div class=\"absolute inset-0 opacity-10\"><div class=\"absolute top-20 left-20 w-72 h-72 bg-orange-400 rounded-full blur-3xl\" style=\"background-color:#CD845B\"></div><div class=\"absolute bottom-20 right-20 w-96 h-96 bg-orange-300 r",
+        "containerClasses": "mx-auto max-w-6xl px-4 py-10 space-y-12"
+      }
+    }
+  },
+  {
+    "path": "/auth/login",
+    "name": "Вход в систему",
+    "error": "page.goto: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/auth/login\", waiting until \"networkidle\"\u001b[22m\n"
+  },
+  {
+    "path": "/auth/register",
+    "name": "Регистрация",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/auth/forgot-password",
+    "name": "Восстановление пароля",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/blog",
+    "name": "Блог",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/cart",
+    "name": "Корзина",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/categories",
+    "name": "Категории",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/chat",
+    "name": "Чат",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/dishes",
+    "name": "Блюда",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/faq",
+    "name": "FAQ",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/favorites",
+    "name": "Избранное",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/my-gifts",
+    "name": "Мои подарки",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/orders",
+    "name": "Заказы",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/producers",
+    "name": "Производители",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/profile",
+    "name": "Профиль",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/legal/offer",
+    "name": "Оферта",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/legal/privacy",
+    "name": "Политика конфиденциальности",
+    "error": "page.goto: Target page, context or browser has been closed"
+  },
+  {
+    "path": "/seller/seller",
+    "name": "Панель продавца",
+    "error": "page.goto: Target page, context or browser has been closed"
+  }
+]

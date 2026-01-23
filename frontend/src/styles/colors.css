@@ -1,0 +1,269 @@
+/* Color System for HomeFood Marketplace */
+
+/* Import variables */
+@import './variables.css';
+
+/* Primary Colors - Orange accent for food app */
+.color-primary {
+  color: var(--color-primary);
+}
+
+.color-primary-dark {
+  color: var(--color-primary-dark);
+}
+
+.color-primary-light {
+  color: var(--color-primary-light);
+}
+
+.bg-primary {
+  background-color: var(--color-primary);
+}
+
+.bg-primary-dark {
+  background-color: var(--color-primary-dark);
+}
+
+.bg-primary-light {
+  background-color: var(--color-primary-light);
+}
+
+/* Secondary Colors - Red accent for actions */
+.color-secondary {
+  color: var(--color-secondary);
+}
+
+.color-secondary-dark {
+  color: var(--color-secondary-dark);
+}
+
+.color-secondary-light {
+  color: var(--color-secondary-light);
+}
+
+.bg-secondary {
+  background-color: var(--color-secondary);
+}
+
+.bg-secondary-dark {
+  background-color: var(--color-secondary-dark);
+}
+
+.bg-secondary-light {
+  background-color: var(--color-secondary-light);
+}
+
+/* Success Colors */
+.color-success {
+  color: var(--color-success);
+}
+
+.color-success-dark {
+  color: var(--color-success-dark);
+}
+
+.color-success-light {
+  color: var(--color-success-light);
+}
+
+.bg-success {
+  background-color: var(--color-success);
+}
+
+.bg-success-dark {
+  background-color: var(--color-success-dark);
+}
+
+.bg-success-light {
+  background-color: var(--color-success-light);
+}
+
+/* Warning Colors */
+.color-warning {
+  color: var(--color-warning);
+}
+
+.color-warning-dark {
+  color: var(--color-warning-dark);
+}
+
+.color-warning-light {
+  color: var(--color-warning-light);
+}
+
+.bg-warning {
+  background-color: var(--color-warning);
+}
+
+.bg-warning-dark {
+  background-color: var(--color-warning-dark);
+}
+
+.bg-warning-light {
+  background-color: var(--color-warning-light);
+}
+
+/* Error Colors */
+.color-error {
+  color: var(--color-error);
+}
+
+.color-error-dark {
+  color: var(--color-error-dark);
+}
+
+.color-error-light {
+  color: var(--color-error-light);
+}
+
+.bg-error {
+  background-color: var(--color-error);
+}
+
+.bg-error-dark {
+  background-color: var(--color-error-dark);
+}
+
+.bg-error-light {
+  background-color: var(--color-error-light);
+}
+
+/* Neutral Colors */
+.color-white {
+  color: var(--color-white);
+}
+
+.color-black {
+  color: var(--color-black);
+}
+
+.color-gray-50 { color: var(--color-gray-50); }
+.color-gray-100 { color: var(--color-gray-100); }
+.color-gray-200 { color: var(--color-gray-200); }
+.color-gray-300 { color: var(--color-gray-300); }
+.color-gray-400 { color: var(--color-gray-400); }
+.color-gray-500 { color: var(--color-gray-500); }
+.color-gray-600 { color: var(--color-gray-600); }
+.color-gray-700 { color: var(--color-gray-700); }
+.color-gray-800 { color: var(--color-gray-800); }
+.color-gray-900 { color: var(--color-gray-900); }
+
+.bg-white { background-color: var(--color-white); }
+.bg-black { background-color: var(--color-black); }
+.bg-gray-50 { background-color: var(--color-gray-50); }
+.bg-gray-100 { background-color: var(--color-gray-100); }
+.bg-gray-200 { background-color: var(--color-gray-200); }
+.bg-gray-300 { background-color: var(--color-gray-300); }
+.bg-gray-400 { background-color: var(--color-gray-400); }
+.bg-gray-500 { background-color: var(--color-gray-500); }
+.bg-gray-600 { background-color: var(--color-gray-600); }
+.bg-gray-700 { background-color: var(--color-gray-700); }
+.bg-gray-800 { background-color: var(--color-gray-800); }
+.bg-gray-900 { background-color: var(--color-gray-900); }
+
+/* Border Colors */
+.border-primary { border-color: var(--color-primary); }
+.border-secondary { border-color: var(--color-secondary); }
+.border-success { border-color: var(--color-success); }
+.border-warning { border-color: var(--color-warning); }
+.border-error { border-color: var(--color-error); }
+.border-white { border-color: var(--color-white); }
+.border-gray-50 { border-color: var(--color-gray-50); }
+.border-gray-100 { border-color: var(--color-gray-100); }
+.border-gray-200 { border-color: var(--color-gray-200); }
+.border-gray-300 { border-color: var(--color-gray-300); }
+.border-gray-400 { border-color: var(--color-gray-400); }
+.border-gray-500 { border-color: var(--color-gray-500); }
+.border-gray-600 { border-color: var(--color-gray-600); }
+.border-gray-700 { border-color: var(--color-gray-700); }
+.border-gray-800 { border-color: var(--color-gray-800); }
+.border-gray-900 { border-color: var(--color-gray-900); }
+
+/* Focus Ring Colors */
+.focus-ring-primary:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.focus-ring-secondary:focus {
+  outline: 2px solid var(--color-secondary);
+  outline-offset: 2px;
+}
+
+.focus-ring-success:focus {
+  outline: 2px solid var(--color-success);
+  outline-offset: 2px;
+}
+
+.focus-ring-error:focus {
+  outline: 2px solid var(--color-error);
+  outline-offset: 2px;
+}
+
+/* Color Mixins for specific use cases */
+.text-gradient-primary {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-secondary {
+  background: linear-gradient(135deg, var(--color-secondary), var(--color-secondary-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* WCAG AA Contrast Compliant Text Colors */
+.text-on-primary {
+  color: var(--color-white);
+}
+
+.text-on-secondary {
+  color: var(--color-white);
+}
+
+.text-on-success {
+  color: var(--color-white);
+}
+
+.text-on-warning {
+  color: var(--color-black);
+}
+
+.text-on-error {
+  color: var(--color-white);
+}
+
+/* Semantic Color Classes */
+.text-accent { color: var(--color-primary); }
+.text-muted { color: var(--color-gray-500); }
+.text-disabled { color: var(--color-gray-400); }
+
+.bg-accent { background-color: var(--color-primary); }
+.bg-muted { background-color: var(--color-gray-100); }
+.bg-disabled { background-color: var(--color-gray-200); }
+
+/* Hover States */
+.hover\:bg-primary:hover { background-color: var(--color-primary); }
+.hover\:bg-primary-dark:hover { background-color: var(--color-primary-dark); }
+.hover\:bg-primary-light:hover { background-color: var(--color-primary-light); }
+.hover\:bg-secondary:hover { background-color: var(--color-secondary); }
+.hover\:bg-secondary-dark:hover { background-color: var(--color-secondary-dark); }
+.hover\:bg-success:hover { background-color: var(--color-success); }
+.hover\:bg-warning:hover { background-color: var(--color-warning); }
+.hover\:bg-error:hover { background-color: var(--color-error); }
+
+.hover\:text-primary:hover { color: var(--color-primary); }
+.hover\:text-secondary:hover { color: var(--color-secondary); }
+.hover\:text-success:hover { color: var(--color-success); }
+.hover\:text-warning:hover { color: var(--color-warning); }
+.hover\:text-error:hover { color: var(--color-error); }
+
+/* Active States */
+.active\:bg-primary:active { background-color: var(--color-primary-dark); }
+.active\:bg-secondary:active { background-color: var(--color-secondary-dark); }
+.active\:bg-success:active { background-color: var(--color-success-dark); }
+.active\:bg-warning:active { background-color: var(--color-warning-dark); }
+.active\:bg-error:active { background-color: var(--color-error-dark); }
