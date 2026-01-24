@@ -43,7 +43,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 
   return (
     <section
-      className="relative min-h-[600px] flex items-center justify-center bg-gray-800 rounded-3xl shadow-2xl overflow-hidden mx-4 sm:mx-6 lg:mx-8 pt-6"
+      className="relative min-h-[600px] flex items-center justify-center bg-gradient-to-br from-amber-900 to-orange-950 rounded-3xl shadow-2xl overflow-hidden pt-6"
       aria-labelledby="hero-title"
     >
       {/* Background Pattern */}

@@ -131,7 +131,7 @@ export default function HomeCardsSection({
                 Все блюда
               </Link>
             </div>
-            <ul className="grid grid-cols-2 md:grid-cols-6 gap-5" style={{ transform: "translateX(-4px)" }}>
+            <ul className="grid grid-cols-2 md:grid-cols-6 gap-5" style={{ transform: "translateX(-4px)", ["--dish-card-h"]: "320px" } as CSSProperties}>
               {filteredRecommended.slice(0, 2).map((d, index) => (
                 <li key={d.id} className="md:col-span-3">
                   <DishCard dish={d} onOpen={openDish} forceBuyButton={index === 0} />
@@ -163,39 +163,36 @@ export default function HomeCardsSection({
           })}
         </ul>
 
-        <section className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 bg-white rounded-2xl shadow-lg p-6 mb-4 pt-6">
-          <div className="flex items-baseline justify-between h-10 md:h-12">
-            <h2 className="text-xl md:text-2xl font-semibold">Скоро</h2>
-            <Link href="/dishes?section=soon" className="btn-warm">
-              Все блюда
-            </Link>
-          </div>
+        <div className="flex items-baseline justify-between h-10 md:h-12">
+          <h2 className="text-xl md:text-2xl font-semibold">Скоро</h2>
+          <Link href="/dishes?section=soon" className="btn-warm">
+            Все блюда
+          </Link>
+        </div>
 
-          <ul className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-6" style={{ ["--dish-card-h"]: "320px" } as CSSProperties}>
-            {(soon.length > 0 ? soon.slice(0, 8) : []).map((d) => (
-              <li key={d.id}>
-                <DishCard dish={d} onOpen={openDish} />
+        <ul className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-6" style={{ ["--dish-card-h"]: "320px" } as CSSProperties}>
+          {(soon.length > 0 ? soon.slice(0, 8) : []).map((d) => (
+            <li key={d.id}>
+              <DishCard dish={d} onOpen={openDish} />
+            </li>
+          ))}
+
+          {soon.length === 0 &&
+            promosPlaceholder.slice(0, 4).map((p, i) => (
+              <li key={`soon-ph-${i}`}>
+                <DishCardPlaceholder name={p.name} price={p.price} badge="Скоро" />
               </li>
             ))}
+        </ul>
 
-            {soon.length === 0 &&
-              promosPlaceholder.slice(0, 4).map((p, i) => (
-                <li key={`soon-ph-${i}`}>
-                  <DishCardPlaceholder name={p.name} price={p.price} badge="Скоро" />
-                </li>
-              ))}
-          </ul>
-        </section>
+        <div className="flex items-baseline justify-between h-10 md:h-12">
+          <h2 className="text-xl md:text-2xl font-semibold">Скидки и акции</h2>
+          <Link href="/dishes?section=discounts" className="btn-warm">
+            Все предложения
+          </Link>
+        </div>
 
-        <section className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 bg-white rounded-2xl shadow-lg p-6 mb-4 pt-6">
-          <div className="flex items-baseline justify-between h-10 md:h-12">
-            <h2 className="text-xl md:text-2xl font-semibold">Скидки и акции</h2>
-            <Link href="/dishes?section=discounts" className="btn-warm">
-              Все предложения
-            </Link>
-          </div>
-
-          <ul className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-6" style={{ ["--dish-card-h"]: "320px" } as CSSProperties}>
+        <ul className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-6" style={{ ["--dish-card-h"]: "320px" } as CSSProperties}>
             {(discounted.length > 0 ? discounted : []).map((d) => (
               <li key={d.id}>
                 <DishCard dish={d} onOpen={openDish} />
@@ -209,7 +206,6 @@ export default function HomeCardsSection({
                 </li>
               ))}
           </ul>
-        </section>
       </section>
     </>
   );
