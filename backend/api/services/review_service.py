@@ -285,3 +285,152 @@ class ReviewService:
             .select_related('user', 'order', 'order__dish', 'producer')
             .order_by('-created_at')[:limit]
         )
+
+    @staticmethod
+    def request_review_correction(review, producer, refund_amount):
+        """
+        Продавец предлагает вернуть деньги за исправление оценки.
+        Сохранить original_rating_* (если еще не сохранено).
+        Установить refund_offered_amount.
+        Установить correction_requested_at.
+        Отправить уведомление покупателю.
+        """
+        if review.producer != producer:
+            raise ValueError("Review does not belong to this producer")
+
+        if review.is_updated:
+            raise ValueError("Review has already been updated")
+
+        # Сохраняем оригинальные рейтинги, если еще не сохранены
+        if review.original_rating_taste is None:
+            review.original_rating_taste = review.rating_taste
+        if review.original_rating_appearance is None:
+            review.original_rating_appearance = review.rating_appearance
+        if review.original_rating_service is None:
+            review.original_rating_service = review.rating_service
+
+        # Устанавливаем сумму возврата
+        review.refund_offered_amount = refund_amount
+        review.correction_requested_at = timezone.now()
+        review.save(
+            update_fields=[
+                "original_rating_taste",
+                "original_rating_appearance",
+                "original_rating_service",
+                "refund_offered_amount",
+                "correction_requested_at",
+            ]
+        )
+
+        # Отправляем уведомление покупателю
+        ReviewService._notify_buyer_about_correction_offer(review)
+
+        logger.info(f"Review correction requested for review {review.id} by producer {producer.id}")
+        return review
+
+    @staticmethod
+    def accept_review_correction(review, buyer, new_ratings: dict):
+        """
+        Покупатель принимает предложение и исправляет оценку.
+        Проверить что исправление возможно (is_updated == False).
+        Обновить рейтинги.
+        Установить is_updated = True.
+        Установить correction_approved_at.
+        Вернуть деньги покупателю.
+        Можно исправить только 1 раз.
+        """
+        if review.user != buyer:
+            raise ValueError("Review does not belong to this buyer")
+
+        if review.is_updated:
+            raise ValueError("Review has already been updated")
+
+        # Проверяем, что было предложено исправление
+        if review.refund_offered_amount is None or review.refund_offered_amount <= 0:
+            raise ValueError("No correction offer available")
+
+        # Обновляем рейтинги
+        review.rating_taste = new_ratings.get("rating_taste", review.rating_taste)
+        review.rating_appearance = new_ratings.get("rating_appearance", review.rating_appearance)
+        review.rating_service = new_ratings.get("rating_service", review.rating_service)
+
+        # Устанавливаем флаги
+        review.is_updated = True
+        review.refund_accepted = True
+        review.correction_approved_at = timezone.now()
+        review.save(
+            update_fields=[
+                "rating_taste",
+                "rating_appearance",
+                "rating_service",
+                "is_updated",
+                "refund_accepted",
+                "correction_approved_at",
+            ]
+        )
+
+        # Возвращаем деньги покупателю
+        ReviewService._refund_buyer_for_correction(review)
+
+        # Пересчитываем рейтинг магазина
+        from .rating_service import RatingService
+        rating_service = RatingService()
+        rating_service.recalc_for_producer(review.producer)
+
+        logger.info(f"Review correction accepted for review {review.id} by buyer {buyer.id}")
+        return review
+
+    @staticmethod
+    def reject_review_correction(review, buyer):
+        """
+        Покупатель отклоняет предложение.
+        """
+        if review.user != buyer:
+            raise ValueError("Review does not belong to this buyer")
+
+        if review.is_updated:
+            raise ValueError("Review has already been updated")
+
+        # Просто отмечаем, что предложение отклонено
+        review.refund_accepted = False
+        review.save(update_fields=["refund_accepted"])
+
+        logger.info(f"Review correction rejected for review {review.id} by buyer {buyer.id}")
+        return review
+
+    @staticmethod
+    def _notify_buyer_about_correction_offer(review):
+        """
+        Отправить уведомление покупателю о предложении исправления.
+        """
+        # TODO: Реализовать отправку уведомления через NotificationService
+        logger.info(f"Notification sent to buyer about correction offer for review {review.id}")
+
+    @staticmethod
+    def _refund_buyer_for_correction(review):
+        """
+        Вернуть деньги покупателю за исправление оценки.
+        """
+        from .payment_service import PaymentService
+        from api.models import Payment
+
+        order = review.order
+        payment = order.current_payment
+
+        if not payment:
+            # Пробуем найти другой платеж
+            payment = order.payments.filter(
+                status__in=[
+                    Payment.Status.SUCCEEDED,
+                    Payment.Status.PARTIALLY_REFUNDED,
+                ]
+            ).last()
+
+        if payment and review.refund_offered_amount > 0:
+            remaining = payment.amount - payment.refunded_amount
+            if remaining > 0:
+                amount_to_refund = min(remaining, review.refund_offered_amount)
+                if amount_to_refund > 0:
+                    payment_service = PaymentService()
+                    payment_service.refund_payment(payment, amount=amount_to_refund)
+                    logger.info(f"Refunded {amount_to_refund} to buyer for review correction")

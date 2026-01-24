@@ -300,7 +300,7 @@ class CategorySerializer(serializers.ModelSerializer):
 class DishImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = DishImage
-        fields = ["id", "image"]
+        fields = ["id", "image", "is_primary", "sort_order"]
 
 
 class DishSerializer(serializers.ModelSerializer):
@@ -397,6 +397,19 @@ class DishSerializer(serializers.ModelSerializer):
             except (TypeError, ValueError):
                 price_val = 0
             DishTopping.objects.create(dish=dish, name=name, price=price_val)
+
+    def validate(self, data):
+        """
+        При создании нового товара должно быть минимум 3 фото.
+        """
+        # При создании нового товара должно быть минимум 3 фото
+        if self.instance is None:  # Создание нового товара
+            request = self.context.get('request')
+            if request and hasattr(request, 'FILES') and request.FILES:
+                images_count = len([k for k in request.FILES.keys() if k.startswith('image')])
+                if images_count < 3:
+                    raise serializers.ValidationError("Необходимо загрузить минимум 3 фотографии товара")
+        return data
 
 
 class DisputeSerializer(serializers.ModelSerializer):

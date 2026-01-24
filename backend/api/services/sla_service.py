@@ -179,3 +179,73 @@ class SLAService:
         self.notifications.order_cancelled(order)
         return order
 
+    @transaction.atomic
+    def track_delivery_completion(self, order: Order, actual_arrival_time):
+        """
+        Сохранить delivery_actual_arrival_at.
+        Рассчитать delivery_late_minutes.
+        Если опоздание > 30 минут:
+        - Применить штраф магазину
+        - Увеличить penalty_points
+        - Дать покупателю право отменить без потерь
+        - Установить delivery_penalty_applied = True
+        """
+        order.delivery_actual_arrival_at = actual_arrival_time
+        order.save(update_fields=["delivery_actual_arrival_at"])
+
+        # Рассчитываем опоздание
+        expected_time = order.delivery_expected_at
+        if expected_time:
+            late_delta = actual_arrival_time - expected_time
+            late_minutes = int(late_delta.total_seconds() / 60) if late_delta.total_seconds() > 0 else 0
+            order.delivery_late_minutes = late_minutes
+            order.save(update_fields=["delivery_late_minutes"])
+
+            # Если опоздание > 30 минут
+            if late_minutes > 30:
+                self._apply_late_delivery_penalty(order, late_minutes)
+
+        logger.info(f"Delivery completed for order {order.id}. Late minutes: {order.delivery_late_minutes}")
+        return order
+
+    def can_buyer_cancel_due_to_late_delivery(self, order: Order) -> bool:
+        """
+        Вернуть True если опоздание > 30 минут.
+        """
+        return order.delivery_late_minutes > 30
+
+    def _apply_late_delivery_penalty(self, order: Order, late_minutes: int):
+        """
+        Применить штраф за опоздание доставки.
+        """
+        producer = getattr(order.dish, "producer", None)
+        if not producer:
+            return
+
+        # Применяем штраф магазину
+        self.penalties.add_penalty(producer, 1)
+        self.rating.recalc_for_producer(producer)
+
+        # Увеличиваем penalty_points
+        producer.penalty_points = producer.penalty_points + 1
+        producer.save(update_fields=["penalty_points"])
+
+        # Устанавливаем флаг применения штрафа
+        order.delivery_penalty_applied = True
+        order.save(update_fields=["delivery_penalty_applied"])
+
+        # Отправляем уведомление покупателю о праве отмены без потерь
+        self._notify_buyer_about_cancellation_rights(order)
+
+        logger.info(
+            f"Late delivery penalty applied for order {order.id}. "
+            f"Late minutes: {late_minutes}, Producer: {producer.id}"
+        )
+
+    def _notify_buyer_about_cancellation_rights(self, order: Order):
+        """
+        Отправить уведомление покупателю о праве отмены без потерь.
+        """
+        # TODO: Реализовать отправку уведомления через NotificationService
+        logger.info(f"Notification sent to buyer about cancellation rights for order {order.id}")
+

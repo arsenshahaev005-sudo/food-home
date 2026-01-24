@@ -108,6 +108,11 @@ class Producer(models.Model):
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     rating_count = models.PositiveIntegerField(default=0)
 
+    # Ban fields
+    ban_reason = models.TextField(blank=True)
+    banned_at = models.DateTimeField(null=True, blank=True)
+    unban_date = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(default=django.utils.timezone.now)
     latitude = models.DecimalField(
         max_digits=9, decimal_places=6, blank=True, null=True
@@ -147,6 +152,14 @@ class Payout(models.Model):
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="PENDING")
     created_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
+    tax_paid = models.BooleanField(default=False)
+    tax_payment_id = models.CharField(max_length=255, blank=True)
+    tax_payment_date = models.DateTimeField(null=True, blank=True)
+    kontur_sign_status = models.CharField(max_length=50, blank=True)
+    kontur_sign_date = models.DateTimeField(null=True, blank=True)
+    scheduled_for = models.DateTimeField(null=True, blank=True)
+    payout_frequency = models.CharField(max_length=20, default="WEEKLY")
+    next_payout_date = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Payout {self.id} for {self.producer.name}"
@@ -223,6 +236,7 @@ class Dish(models.Model):
     rating = models.FloatField(default=0)
     rating_count = models.PositiveIntegerField(default=0)
     sort_score = models.FloatField(default=0)
+    repeat_purchase_count = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.name
@@ -255,6 +269,8 @@ class GiftProduct(models.Model):
 class DishImage(models.Model):
     dish = models.ForeignKey(Dish, on_delete=models.CASCADE, related_name="images")
     image = models.URLField()
+    is_primary = models.BooleanField(default=False)
+    sort_order = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return f"Image for {self.dish.name}"
@@ -280,6 +296,9 @@ class PromoCode(models.Model):
     is_used = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True, blank=True)
+    sms_sent = models.BooleanField(default=False)
+    sms_sent_at = models.DateTimeField(null=True, blank=True)
+    sms_status = models.CharField(max_length=50, blank=True)
 
     def __str__(self):
         return f"{self.code} ({self.reward_type})"
@@ -376,6 +395,8 @@ class Order(models.Model):
         max_length=20, choices=CANCELLED_BY_CHOICES, null=True, blank=True
     )
     cancelled_reason = models.TextField(blank=True)
+    cancellation_penalty_applied = models.BooleanField(default=False)
+    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     estimated_cooking_time = models.PositiveIntegerField(
         default=0, help_text="Total minutes"
@@ -387,10 +408,13 @@ class Order(models.Model):
 
     # Financial snapshots
     tips_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tips_tax_exempt = models.BooleanField(default=True)
     commission_rate_snapshot = models.DecimalField(
         max_digits=5, decimal_places=4, default=0.0
     )  # stored as 0.05 for 5%
     commission_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    penalty_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    penalty_reason = models.TextField(blank=True)
     producer_gross_amount = models.DecimalField(
         max_digits=10, decimal_places=2, default=0
     )
@@ -425,6 +449,10 @@ class Order(models.Model):
     delivery_longitude = models.DecimalField(
         max_digits=9, decimal_places=6, blank=True, null=True
     )
+    delivery_expected_at = models.DateTimeField(null=True, blank=True)
+    delivery_actual_arrival_at = models.DateTimeField(null=True, blank=True)
+    delivery_late_minutes = models.PositiveIntegerField(default=0)
+    delivery_penalty_applied = models.BooleanField(default=False)
 
     # Rescheduling logic
     reschedule_requested_by_seller = models.BooleanField(default=False)
@@ -451,6 +479,8 @@ class Order(models.Model):
         max_length=64, unique=True, blank=True, null=True, db_index=True
     )
     recipient_token_expires_at = models.DateTimeField(null=True, blank=True)
+    recipient_sms_sent = models.BooleanField(default=False)
+    recipient_sms_sent_at = models.DateTimeField(null=True, blank=True)
     tinkoff_payment_id = models.CharField(
         max_length=255, blank=True, null=True, db_index=True
     )
@@ -520,6 +550,13 @@ class Review(models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True
     )
     refund_accepted = models.BooleanField(default=False)
+
+    # Original rating fields for correction tracking
+    original_rating_taste = models.PositiveIntegerField(null=True, blank=True)
+    original_rating_appearance = models.PositiveIntegerField(null=True, blank=True)
+    original_rating_service = models.PositiveIntegerField(null=True, blank=True)
+    correction_requested_at = models.DateTimeField(null=True, blank=True)
+    correction_approved_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1027,6 +1064,16 @@ class Profile(models.Model):
     disputes_lost = models.PositiveIntegerField(default=0)
     unjustified_cancellations = models.PositiveIntegerField(default=0)
     gift_notification_preferences = models.JSONField(default=dict, blank=True)
+
+    # Repeat purchase stats
+    total_orders = models.PositiveIntegerField(default=0)
+    repeated_orders = models.PositiveIntegerField(default=0)
+    repeat_purchase_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
+    # Problem buyer fields
+    is_problem_buyer = models.BooleanField(default=False)
+    problem_buyer_reason = models.TextField(blank=True)
+    blocked_by_producers = models.JSONField(default=list, blank=True)
 
 
 class PendingRegistration(models.Model):

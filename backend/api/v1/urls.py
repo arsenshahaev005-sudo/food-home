@@ -14,6 +14,7 @@ from api.v1.producers.urls import router as producers_router
 from api.v1.cart.urls import router as cart_router
 from api.v1.payments.urls import router as payments_router
 from api.v1.gifts.urls import router as gifts_router
+from api.v1.reviews.urls import router as reviews_router
 
 # Create unified router
 router = DefaultRouter()
@@ -26,5 +27,6 @@ router.registry.extend(producers_router.registry)
 router.registry.extend(cart_router.registry)
 router.registry.extend(payments_router.registry)
 router.registry.extend(gifts_router.registry)
+router.registry.extend(reviews_router.registry)
 
 urlpatterns = router.urls

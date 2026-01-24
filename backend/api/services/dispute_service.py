@@ -1,13 +1,16 @@
 from decimal import Decimal
+import logging
 
 from django.db import transaction
 from django.utils import timezone
 
-from api.models import Order, Dispute, Payment
+from api.models import Order, Dispute, Payment, Profile, Producer
 from .order_finance_service import OrderFinanceService
 from .payment_service import PaymentService
 from .penalties import PenaltyService
 from .rating_service import RatingService
+
+logger = logging.getLogger(__name__)
 
 
 class DisputeService:
@@ -212,3 +215,241 @@ class DisputeService:
             order.save(update_fields=["status"])
 
         return order, dispute
+
+    @transaction.atomic
+    def create_complaint_from_order(self, order: Order, user, complaint_text: str) -> Dispute:
+        """
+        Создать претензию после того, как покупатель отметил заказ как "неудовлетворительно".
+        Отправить уведомление магазину.
+        """
+        if order.status not in ["ARRIVED", "COMPLETED"]:
+            raise ValueError("Order must be in ARRIVED or COMPLETED status to create a complaint")
+
+        if order.user != user:
+            raise ValueError("Only the order owner can create a complaint")
+
+        # Проверяем, нет ли уже активной претензии
+        if order.disputes.filter(status__in=["OPEN", "WAITING_SELLER", "WAITING_SUPPORT"]).exists():
+            raise ValueError("Order already has an active complaint")
+
+        # Создаем претензию
+        dispute = Dispute.objects.create(
+            order=order,
+            reason="QUALITY",
+            description=complaint_text,
+            opened_by="BUYER",
+            opened_by_user=user,
+            status="WAITING_SELLER",
+        )
+
+        # Обновляем статус заказа
+        if order.status != "DISPUTE":
+            order.status = "DISPUTE"
+            order.save(update_fields=["status"])
+
+        # Отправляем уведомление магазину
+        self._notify_producer_about_complaint(dispute)
+
+        logger.info(f"Complaint created for order {order.id} by user {user.id}")
+        return dispute
+
+    @transaction.atomic
+    def accept_complaint(self, dispute: Dispute, producer: Producer) -> tuple[Order, Dispute]:
+        """
+        Магазин принимает претензию.
+        Возврат средств покупателю.
+        """
+        if dispute.status != "WAITING_SELLER":
+            raise ValueError("Complaint is not waiting for seller response")
+
+        order = dispute.order
+        if order.producer != producer:
+            raise ValueError("Only the order producer can accept the complaint")
+
+        # Возвращаем полную стоимость покупателю
+        payment = self._get_payment_for_order(order)
+        if payment:
+            remaining = payment.amount - payment.refunded_amount
+            if remaining > 0:
+                self.payments.refund_payment(payment, amount=remaining)
+
+        # Обновляем статус претензии
+        dispute.status = "RESOLVED_BUYER_WON"
+        dispute.resolution_notes = "Претензия принята магазином"
+        dispute.resolved_at = timezone.now()
+        dispute.compensation_amount = order.total_price
+        dispute.save(update_fields=["status", "resolution_notes", "resolved_at", "compensation_amount"])
+
+        # Обновляем статус заказа
+        order.status = "CANCELLED"
+        order.cancelled_at = timezone.now()
+        order.cancelled_by = "SELLER"
+        order.cancelled_reason = "Претензия принята"
+        order.save(update_fields=["status", "cancelled_at", "cancelled_by", "cancelled_reason"])
+
+        # Добавляем штраф магазину
+        self.penalties.add_penalty(producer, 1)
+        self.rating.recalc_for_producer(producer)
+
+        logger.info(f"Complaint {dispute.id} accepted by producer {producer.id}")
+        return order, dispute
+
+    @transaction.atomic
+    def reject_complaint(self, dispute: Dispute, producer: Producer, reason: str) -> Dispute:
+        """
+        Магазин отклоняет претензию.
+        Автоматически открывается спор.
+        Создать Dispute с типом "COMPLAINT_REJECTED".
+        """
+        if dispute.status != "WAITING_SELLER":
+            raise ValueError("Complaint is not waiting for seller response")
+
+        order = dispute.order
+        if order.producer != producer:
+            raise ValueError("Only the order producer can reject the complaint")
+
+        # Обновляем статус претензии - отклонена магазином
+        dispute.status = "WAITING_SUPPORT"
+        dispute.resolution_notes = f"Отклонено магазином. Причина: {reason}"
+        dispute.save(update_fields=["status", "resolution_notes"])
+
+        # Логируем отклонение
+        logger.info(f"Complaint {dispute.id} rejected by producer {producer.id}. Reason: {reason}")
+
+        return dispute
+
+    @transaction.atomic
+    def resolve_dispute(
+        self,
+        dispute: Dispute,
+        resolution: str,
+        winner: str,
+    ) -> tuple[Order, Dispute]:
+        """
+        Разрешить спор.
+
+        Если виноват магазин (winner="BUYER"):
+        - Штраф 30% от заказа магазину
+        - Возврат полной стоимости покупателю
+        - Увеличить disputes_lost у магазина
+
+        Если претензия необоснованна (winner="SELLER"):
+        - Компенсация 10% магазину (платформа платит)
+        - Увеличить disputes_lost у покупателя
+        - Метка "N споров проиграно"
+        """
+        if dispute.status not in ["OPEN", "WAITING_SELLER", "WAITING_SUPPORT"]:
+            raise ValueError("Dispute is not active")
+
+        order = dispute.order
+        producer = order.producer
+        buyer = order.user
+
+        if winner == "BUYER":
+            # Покупатель прав
+            # Штраф 30% от заказа магазину
+            penalty_amount = order.total_price * Decimal("0.30")
+            producer.balance = producer.balance - penalty_amount
+            producer.save(update_fields=["balance"])
+
+            # Возврат полной стоимости покупателю
+            payment = self._get_payment_for_order(order)
+            if payment:
+                remaining = payment.amount - payment.refunded_amount
+                if remaining > 0:
+                    self.payments.refund_payment(payment, amount=remaining)
+
+            # Обновляем статус претензии
+            dispute.status = "RESOLVED_BUYER_WON"
+            dispute.resolution_notes = "Спор решен в пользу покупателя"
+            dispute.compensation_amount = order.total_price
+            dispute.resolved_at = timezone.now()
+            dispute.save(update_fields=["status", "resolution_notes", "compensation_amount", "resolved_at"])
+
+            # Обновляем статус заказа
+            order.status = "CANCELLED"
+            order.cancelled_at = timezone.now()
+            order.cancelled_by = "ADMIN"
+            order.cancelled_reason = "Спор решен в пользу покупателя"
+            order.save(update_fields=["status", "cancelled_at", "cancelled_by", "cancelled_reason"])
+
+            # Добавляем штраф магазину
+            self.penalties.add_penalty(producer, 2)
+            self.rating.recalc_for_producer(producer)
+
+            logger.info(f"Dispute {dispute.id} resolved in favor of buyer. Penalty: {penalty_amount}")
+
+        elif winner == "SELLER":
+            # Продавец прав
+            # Компенсация 10% магазину (платформа платит)
+            compensation = order.total_price * Decimal("0.10")
+            producer.balance = producer.balance + compensation
+            producer.save(update_fields=["balance"])
+
+            # Увеличиваем disputes_lost у покупателя
+            profile, _ = Profile.objects.get_or_create(user=buyer)
+            profile.disputes_lost = profile.disputes_lost + 1
+            profile.save(update_fields=["disputes_lost"])
+
+            # Если много проигранных споров, отмечаем как проблемного покупателя
+            if profile.disputes_lost >= 3:
+                profile.is_problem_buyer = True
+                profile.problem_buyer_reason = f"Проиграно {profile.disputes_lost} споров"
+                profile.save(update_fields=["is_problem_buyer", "problem_buyer_reason"])
+
+            # Обновляем статус претензии
+            dispute.status = "RESOLVED_SELLER_WON"
+            dispute.resolution_notes = "Спор решен в пользу продавца"
+            dispute.compensation_amount = compensation
+            dispute.resolved_at = timezone.now()
+            dispute.save(update_fields=["status", "resolution_notes", "compensation_amount", "resolved_at"])
+
+            # Начисляем деньги продавцу
+            if order.payout_status == "NOT_ACCRUED":
+                self.finance.on_completed(order)
+
+            order.status = "COMPLETED"
+            order.save(update_fields=["status"])
+
+            logger.info(f"Dispute {dispute.id} resolved in favor of seller. Compensation: {compensation}")
+
+        else:
+            raise ValueError("Winner must be either 'BUYER' or 'SELLER'")
+
+        return order, dispute
+
+    def is_problem_buyer(self, user) -> bool:
+        """
+        Проверка по меткам проблемного покупателя.
+        """
+        try:
+            profile = user.profile
+            return profile.is_problem_buyer
+        except Profile.DoesNotExist:
+            return False
+
+    def can_producer_refuse_buyer(self, producer: Producer, buyer) -> bool:
+        """
+        Может ли магазин отказать покупателю.
+        """
+        # Если покупатель помечен как проблемный, магазин может отказать
+        if self.is_problem_buyer(buyer):
+            return True
+
+        # Проверяем, заблокирован ли покупатель этим магазином
+        try:
+            profile = buyer.profile
+            if profile.blocked_by_producers:
+                blocked_list = profile.blocked_by_producers if isinstance(profile.blocked_by_producers, list) else []
+                return str(producer.id) in blocked_list
+        except Profile.DoesNotExist:
+            return False
+
+        return False
+
+    def _notify_producer_about_complaint(self, dispute: Dispute):
+        """
+        Отправить уведомление магазину о претензии.
+        """
+        # TODO: Реализовать отправку уведомления через NotificationService
+        logger.info(f"Notification sent to producer about complaint {dispute.id}")

@@ -1,14 +1,21 @@
 """
 Сервис для бизнес-логики заказов.
-Включает функции для автосохранения черновиков и повторного заказа.
+Включает функции для автосохранения черновиков, повторного заказа,
+принятия, отклонения и отмены заказов.
 """
 
+import logging
 from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
-from ..models import Order, OrderDraft, Dish
+from ..models import Order, OrderDraft, Dish, Producer
+from .penalty_service import PenaltyService
+from .notifications import NotificationService
+from .payment_service import PaymentService
+
+logger = logging.getLogger(__name__)
 
 
 class OrderService:
@@ -332,3 +339,372 @@ class OrderService:
             "delivery_price": delivery_price,
             "total": total,
         }
+
+    @staticmethod
+    def calculate_multi_item_cooking_time(order_items: List[Order]) -> int:
+        """
+        Рассчитывает время изготовления для множественных позиций.
+
+        Логика: max_time + (second_max_time / 2)
+
+        Args:
+            order_items: Список товаров в заказе
+
+        Returns:
+            int: Общее время изготовления в минутах
+        """
+        if not order_items:
+            return 0
+
+        # Собираем времена изготовления всех товаров
+        cooking_times = []
+        for item in order_items:
+            if hasattr(item, 'dish') and item.dish:
+                cooking_times.append(item.dish.cooking_time_minutes)
+            elif hasattr(item, 'cooking_time_minutes'):
+                cooking_times.append(item.cooking_time_minutes)
+
+        if not cooking_times:
+            return 0
+
+        if len(cooking_times) == 1:
+            return cooking_times[0]
+
+        # Сортируем по убыванию
+        cooking_times.sort(reverse=True)
+
+        max_time = cooking_times[0]
+        second_max_time = cooking_times[1]
+
+        # Формула: max_time + (second_max_time / 2)
+        total_time = max_time + (second_max_time // 2)
+
+        return total_time
+
+    @transaction.atomic
+    def accept_order(self, order: Order, producer: Producer) -> Order:
+        """
+        Принимает заказ продавцом.
+
+        Args:
+            order: Заказ
+            producer: Магазин (Producer)
+
+        Returns:
+            Order: Обновленный заказ
+
+        Raises:
+            ValidationError: Если заказ нельзя принять
+        """
+        if not order:
+            raise ValidationError("Order is required")
+        if not producer:
+            raise ValidationError("Producer is required")
+
+        # Проверяем статус заказа
+        if order.status != "WAITING_FOR_ACCEPTANCE":
+            raise ValidationError("Можно принять только заказы в статусе WAITING_FOR_ACCEPTANCE")
+
+        # Проверяем срок принятия
+        if order.acceptance_deadline and timezone.now() > order.acceptance_deadline:
+            raise ValidationError("Время на принятие заказа истекло")
+
+        # Проверяем, что заказ принадлежит этому магазину
+        if order.producer != producer:
+            raise ValidationError("Вы можете принимать только свои заказы")
+
+        # Изменяем статус на ACCEPTED (или COOKING в зависимости от логики)
+        order.status = "COOKING"
+        order.accepted_at = timezone.now()
+
+        # Обнуляем consecutive_rejections магазина
+        producer.consecutive_rejections = 0
+        producer.save(update_fields=["consecutive_rejections"])
+
+        # Рассчитываем время изготовления для множественных позиций
+        # В текущей структуре заказ содержит одно блюдо, но оставим логику для будущего
+        order.estimated_cooking_time = self.calculate_multi_item_cooking_time([order])
+
+        order.save(update_fields=["status", "accepted_at", "estimated_cooking_time"])
+
+        logger.info(f"Order {order.id} accepted by producer {producer.id}")
+
+        # Отправляем уведомление покупателю
+        notification_service = NotificationService()
+        notification_service.order_accepted(order)
+
+        return order
+
+    @transaction.atomic
+    def reject_order(self, order: Order, producer: Producer, reason: str) -> Order:
+        """
+        Отклоняет заказ продавцом.
+
+        Args:
+            order: Заказ
+            producer: Магазин (Producer)
+            reason: Причина отклонения
+
+        Returns:
+            Order: Обновленный заказ
+
+        Raises:
+            ValidationError: Если заказ нельзя отклонить
+        """
+        if not order:
+            raise ValidationError("Order is required")
+        if not producer:
+            raise ValidationError("Producer is required")
+
+        # Проверяем статус заказа
+        if order.status != "WAITING_FOR_ACCEPTANCE":
+            raise ValidationError("Можно отклонить только заказы в статусе WAITING_FOR_ACCEPTANCE")
+
+        # Проверяем, что заказ принадлежит этому магазину
+        if order.producer != producer:
+            raise ValidationError("Вы можете отклонять только свои заказы")
+
+        # Изменяем статус на CANCELLED_BY_SELLER
+        order.status = "CANCELLED"
+        order.cancelled_by = "SELLER"
+        order.cancelled_reason = reason
+        order.cancelled_at = timezone.now()
+
+        # Применяем штраф через penalty_service
+        penalty_service = PenaltyService()
+        penalty_service.apply_order_rejection_penalty(producer, order)
+
+        order.save(update_fields=["status", "cancelled_by", "cancelled_reason", "cancelled_at"])
+
+        logger.info(f"Order {order.id} rejected by producer {producer.id}. Reason: {reason}")
+
+        # Возвращаем деньги покупателю
+        if order.current_payment:
+            payment_service = PaymentService()
+            try:
+                payment_service.refund_payment(order.current_payment, order.total_price)
+                order.refund_amount = order.total_price
+                order.save(update_fields=["refund_amount"])
+            except Exception as e:
+                logger.error(f"Failed to refund order {order.id}: {e}")
+
+        # Отправляем уведомление покупателю
+        notification_service = NotificationService()
+        notification_service.order_cancelled(order)
+
+        return order
+
+    @transaction.atomic
+    def cancel_order_by_seller(self, order: Order, producer: Producer, reason: str) -> Order:
+        """
+        Отменяет уже принятый заказ продавцом.
+
+        Args:
+            order: Заказ
+            producer: Магазин (Producer)
+            reason: Причина отмены
+
+        Returns:
+            Order: Обновленный заказ
+
+        Raises:
+            ValidationError: Если заказ нельзя отменить
+        """
+        if not order:
+            raise ValidationError("Order is required")
+        if not producer:
+            raise ValidationError("Producer is required")
+
+        # Проверяем, что заказ уже принят
+        if order.status not in ["COOKING", "READY_FOR_REVIEW", "READY_FOR_DELIVERY"]:
+            raise ValidationError("Можно отменить только принятые заказы")
+
+        # Проверяем, что заказ принадлежит этому магазину
+        if order.producer != producer:
+            raise ValidationError("Вы можете отменять только свои заказы")
+
+        # Изменяем статус на CANCELLED_BY_SELLER
+        order.status = "CANCELLED"
+        order.cancelled_by = "SELLER"
+        order.cancelled_reason = reason
+        order.cancelled_at = timezone.now()
+
+        # Применяем штраф 30% через penalty_service
+        penalty_service = PenaltyService()
+        penalty_service.apply_order_rejection_penalty(producer, order)
+
+        # Устанавливаем флаг применения штрафа
+        order.cancellation_penalty_applied = True
+
+        order.save(update_fields=["status", "cancelled_by", "cancelled_reason", "cancelled_at", "cancellation_penalty_applied"])
+
+        logger.info(f"Order {order.id} cancelled by seller {producer.id}. Reason: {reason}")
+
+        # Возвращаем деньги покупателю
+        if order.current_payment:
+            payment_service = PaymentService()
+            try:
+                payment_service.refund_payment(order.current_payment, order.total_price)
+                order.refund_amount = order.total_price
+                order.save(update_fields=["refund_amount"])
+            except Exception as e:
+                logger.error(f"Failed to refund order {order.id}: {e}")
+
+        # Отправляем уведомление покупателю
+        notification_service = NotificationService()
+        notification_service.order_cancelled(order)
+
+        return order
+
+    @transaction.atomic
+    def cancel_order_by_buyer(self, order: Order, user, reason: str = "") -> Order:
+        """
+        Отменяет заказ покупателем.
+
+        Args:
+            order: Заказ
+            user: Пользователь
+            reason: Причина отмены
+
+        Returns:
+            Order: Обновленный заказ
+
+        Raises:
+            ValidationError: Если заказ нельзя отменить
+        """
+        if not order:
+            raise ValidationError("Order is required")
+        if not user:
+            raise ValidationError("User is required")
+
+        # Проверяем, что заказ принадлежит этому пользователю
+        if order.user != user:
+            raise ValidationError("Вы можете отменять только свои заказы")
+
+        # Проверяем, что заказ можно отменить
+        if order.status in ["COMPLETED", "DELIVERING", "ARRIVED"]:
+            raise ValidationError("Этот заказ нельзя отменить")
+
+        # Если нет finished_photo - отмена без потерь
+        if not order.finished_photo:
+            order.status = "CANCELLED"
+            order.cancelled_by = "BUYER"
+            order.cancelled_reason = reason
+            order.cancelled_at = timezone.now()
+
+            order.save(update_fields=["status", "cancelled_by", "cancelled_reason", "cancelled_at"])
+
+            # Возвращаем деньги покупателю
+            if order.current_payment:
+                payment_service = PaymentService()
+                try:
+                    payment_service.refund_payment(order.current_payment, order.total_price)
+                    order.refund_amount = order.total_price
+                    order.save(update_fields=["refund_amount"])
+                except Exception as e:
+                    logger.error(f"Failed to refund order {order.id}: {e}")
+
+            logger.info(f"Order {order.id} cancelled by buyer {user.id} without penalty")
+
+        # Если есть finished_photo - компенсация магазину 10%
+        else:
+            order.status = "CANCELLED"
+            order.cancelled_by = "BUYER"
+            order.cancelled_reason = reason
+            order.cancelled_at = timezone.now()
+
+            # Компенсация магазину 10% (платформа платит)
+            compensation_amount = order.total_price * Decimal("0.10")
+            if order.producer:
+                order.producer.balance += compensation_amount
+                order.producer.save(update_fields=["balance"])
+
+            # Увеличиваем unjustified_cancellations у покупателя
+            if hasattr(user, 'profile'):
+                user.profile.unjustified_cancellations += 1
+                user.profile.save(update_fields=["unjustified_cancellations"])
+
+            # Возвращаем остаток денег покупателю
+            refund_amount = order.total_price - compensation_amount
+            if order.current_payment:
+                payment_service = PaymentService()
+                try:
+                    payment_service.refund_payment(order.current_payment, refund_amount)
+                    order.refund_amount = refund_amount
+                    order.save(update_fields=["refund_amount"])
+                except Exception as e:
+                    logger.error(f"Failed to refund order {order.id}: {e}")
+
+            logger.info(
+                f"Order {order.id} cancelled by buyer {user.id} with compensation. "
+                f"Compensation: {compensation_amount}"
+            )
+
+        # Отправляем уведомление продавцу
+        notification_service = NotificationService()
+        notification_service.order_cancelled(order)
+
+        return order
+
+    @transaction.atomic
+    def upload_finished_photo(self, order: Order, photo_url: str) -> Order:
+        """
+        Загружает фото готового товара.
+
+        Args:
+            order: Заказ
+            photo_url: URL фото готового товара
+
+        Returns:
+            Order: Обновленный заказ
+        """
+        if not order:
+            raise ValidationError("Order is required")
+
+        # Проверяем статус заказа
+        if order.status != "COOKING":
+            raise ValidationError("Фото можно загрузить только для заказа в статусе COOKING")
+
+        # Сохраняем фото
+        order.finished_photo = photo_url
+        order.status = "READY_FOR_REVIEW"
+        order.ready_at = timezone.now()
+        order.save(update_fields=["finished_photo", "status", "ready_at"])
+
+        logger.info(f"Finished photo uploaded for order {order.id}")
+
+        # Отправляем уведомление покупателю
+        notification_service = NotificationService()
+        notification_service.order_ready_for_review(order)
+
+        return order
+
+    @transaction.atomic
+    def add_tips(self, order: Order, amount: float) -> Order:
+        """
+        Добавляет чаевые к заказу.
+
+        Args:
+            order: Заказ
+            amount: Сумма чаевых
+
+        Returns:
+            Order: Обновленный заказ
+        """
+        if not order:
+            raise ValidationError("Order is required")
+
+        if amount <= 0:
+            raise ValidationError("Сумма чаевых должна быть больше 0")
+
+        # Проверяем статус заказа
+        if order.status not in ["DELIVERING", "ARRIVED", "COMPLETED"]:
+            raise ValidationError("Чаевые можно добавить только для доставленного или завершенного заказа")
+
+        # Добавляем чаевые
+        order.tips_amount = Decimal(str(amount))
+        order.save(update_fields=["tips_amount"])
+
+        logger.info(f"Tips added for order {order.id}. Amount: {amount}")
+
+        return order
