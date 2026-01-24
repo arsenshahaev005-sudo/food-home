@@ -3910,27 +3910,44 @@ class EmailLoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Логирование для диагностики
+        logger.info(f"Login attempt - Method: {request.method}, Path: {request.path}")
+        logger.info(f"Request headers: {dict(request.headers)}")
+        logger.info(f"Request data: {request.data}")
+        logger.info(f"Content-Type: {request.content_type}")
+        
         email = request.data.get("email")
         password = request.data.get("password")
         role = request.data.get("role", "CLIENT")  # Get requested role
 
         User = get_user_model()
         is_phone_login = False
+        
+        # Логирование полученных данных
+        logger.info(f"Login attempt - Email: {email}, Password provided: {bool(password)}, Role: {role}")
+        
         try:
             user = User.objects.get(email__iexact=email)
+            logger.info(f"User found: {user.email}, Active: {user.is_active}")
         except User.DoesNotExist:
             # Try phone
             try:
                 profile = Profile.objects.get(phone=email)
                 user = profile.user
                 is_phone_login = True
+                logger.info(f"User found via phone: {user.email}, Active: {user.is_active}")
             except Profile.DoesNotExist:
+                logger.warning(f"User not found - Email: {email}, Phone: {email}")
                 return Response(
                     {"detail": "Неверные учетные данные"},
                     status=status.HTTP_401_UNAUTHORIZED,
                 )
 
         if not user.check_password(password):
+            logger.warning(f"Invalid password for user: {user.email}")
             return Response(
                 {"detail": "Неверные учетные данные"},
                 status=status.HTTP_401_UNAUTHORIZED,

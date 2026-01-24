@@ -1,6 +1,9 @@
 {
-  "/(main)/page": "app/(main)/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/(main)/auth/login/page": "app/(main)/auth/login/page.js",
-  "/(main)/cart/page": "app/(main)/cart/page.js",
-  "/(main)/dishes/page": "app/(main)/dishes/page.js"
+  "/(main)/auth/register/page": "app/(main)/auth/register/page.js",
+  "/(main)/dishes/page": "app/(main)/dishes/page.js",
+  "/(main)/page": "app/(main)/page.js",
+  "/(main)/profile/page": "app/(main)/profile/page.js",
+  "/(seller)/seller/page": "app/(seller)/seller/page.js"
 }

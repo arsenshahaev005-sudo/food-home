@@ -215,10 +215,10 @@ const PageWrapper: React.FC<PageWrapperProps> = ({ initialData, initialFilters }
         </div>
       )}
 
-      <section className="space-y-4">
-        <h2 className="text-lg md:text-xl font-semibold" style={{ color: "#4b2f23" }}>
-          {currentTitle}
-        </h2>
+      <section className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 bg-white rounded-2xl shadow-lg p-6 mb-4 pt-6">
+        <div className="flex items-baseline justify-between h-10 md:h-12">
+          <h2 className="text-xl md:text-2xl font-semibold">{currentTitle}</h2>
+        </div>
         {loading ? (
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>

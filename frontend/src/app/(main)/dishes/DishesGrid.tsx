@@ -26,7 +26,7 @@ export default function DishesGrid({ dishes }: { dishes: Dish[] }) {
         onClose={closeDish}
       />
       <ul
-        className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-6"
+        className="grid grid-cols-2 md:grid-cols-4 gap-5"
         style={{ ["--dish-card-h"]: "320px" } as CSSProperties}
       >
         {dishes.map((d) => (
