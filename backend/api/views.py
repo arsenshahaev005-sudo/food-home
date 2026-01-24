@@ -558,6 +558,58 @@ def sanitize_shop_text(text: str, max_len: int):
     return t
 
 
+def _create_producer_for_user(user, shop_name=None, city="Москва"):
+    """
+    Автоматическое создание Producer профиля для пользователя.
+    Используется при первой попытке входа как SELLER.
+    
+    Args:
+        user: Объект User
+        shop_name: Название магазина (опционально)
+        city: Город (по умолчанию "Москва")
+    
+    Returns:
+        tuple: (success: bool, producer: Producer or None, message: str)
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Проверяем, что у пользователя еще нет Producer
+        if _safe_has_producer(user):
+            logger.info(f"User {user.email} already has Producer profile, skipping creation")
+            return True, user.producer, "Producer profile already exists"
+        
+        # Генерируем название магазина, если не предоставлено
+        if not shop_name:
+            shop_name = f"Магазин {user.first_name or user.email.split('@')[0]}"
+        
+        # Проверяем название магазина через модерацию
+        moderation = moderate_shop_name(shop_name)
+        if not moderation.get("approved"):
+            logger.warning(f"Shop name '{shop_name}' did not pass moderation for user {user.email}")
+            return False, None, f"Shop name moderation failed: {moderation.get('reason', 'unknown')}"
+        
+        logger.info(f"Creating Producer for user {user.email} with shop name: {shop_name}")
+        
+        # Создаем Producer профиль
+        with transaction.atomic():
+            producer = Producer.objects.create(
+                user=user,
+                name=shop_name,
+                city=city,
+                description="",
+                short_description=""
+            )
+            logger.info(f"Producer created successfully - ID: {producer.id}, User: {user.email}, Name: {producer.name}")
+        
+        return True, producer, "Producer profile created successfully"
+    
+    except Exception as e:
+        logger.error(f"Error creating Producer for user {user.email}: {str(e)}", exc_info=True)
+        return False, None, f"Error creating Producer: {str(e)}"
+
+
 def ollama_chat_once(model: str, system: str, user: str, timeout_s: int = 18):
     base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
     resp = requests.post(
@@ -3014,9 +3066,14 @@ class VerifyRegistrationView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        
         email = request.data.get("email")
         code = request.data.get("code")
         User = get_user_model()
+        
+        logger.info(f"VerifyRegistration attempt - Email: {email}, Code provided: {bool(code)}")
 
         # Check PendingRegistration
         try:
@@ -3069,25 +3126,43 @@ class VerifyRegistrationView(APIView):
                 role = "CLIENT"
                 if hasattr(pending_reg, "role") and pending_reg.role:
                     role = pending_reg.role
+                
+                logger.info(f"Verification - User: {user.email}, Role: {role}, Has producer: {_safe_has_producer(user)}")
 
                 # Create Producer if role is SELLER
                 if role == "SELLER" and not _safe_has_producer(user):
+                    logger.info(f"Creating Producer for user {user.email} (user was created: {user.email == pending_reg.email})")
                     shop_name = getattr(pending_reg, "shop_name", "")
                     if not shop_name:
                         shop_name = (
                             f"{pending_reg.first_name} {pending_reg.last_name}".strip()
                             or "Новый продавец"
                         )
+                    logger.info(f"Shop name for Producer: {shop_name}")
                     moderation = moderate_shop_name(shop_name)
+                    logger.info(f"Moderation result: {moderation}")
                     if not moderation.get("approved"):
+                        logger.warning(f"Shop name '{shop_name}' did not pass moderation")
                         return Response(
                             {"detail": "Название магазина не прошло модерацию"},
                             status=status.HTTP_400_BAD_REQUEST,
                         )
 
-                    Producer.objects.create(
-                        user=user, name=shop_name, city="Москва"  # Default city
-                    )
+                    try:
+                        producer = Producer.objects.create(
+                            user=user, name=shop_name, city="Москва"  # Default city
+                        )
+                        logger.info(f"Producer created successfully - ID: {producer.id}, User: {user.email}, Name: {producer.name}")
+                    except Exception as e:
+                        logger.error(f"Error creating Producer for user {user.email}: {str(e)}", exc_info=True)
+                        return Response(
+                            {"detail": f"Ошибка создания профиля продавца: {str(e)}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+                elif role == "SELLER" and _safe_has_producer(user):
+                    logger.info(f"User {user.email} already has Producer profile, skipping creation")
+                elif role == "CLIENT":
+                    logger.info(f"User {user.email} is registering as CLIENT, no Producer needed")
 
                 # Delete pending registration
                 pending_reg.delete()
@@ -3107,6 +3182,7 @@ class VerifyRegistrationView(APIView):
                     status=status.HTTP_200_OK,
                 )
         except Exception as e:
+            logger.error(f"Error in VerifyRegistrationView: {str(e)}", exc_info=True)
             return Response(
                 {"detail": f"Error creating user: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -3929,6 +4005,21 @@ class EmailLoginView(APIView):
         # Логирование полученных данных
         logger.info(f"Login attempt - Email: {email}, Password provided: {bool(password)}, Role: {role}")
         
+        # Валидация входных данных
+        if not email:
+            logger.warning("Login attempt failed: Email is required")
+            return Response(
+                {"detail": "Email или номер телефона обязателен"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        if not password:
+            logger.warning(f"Login attempt failed: Password is required for {email}")
+            return Response(
+                {"detail": "Пароль обязателен"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
         try:
             user = User.objects.get(email__iexact=email)
             logger.info(f"User found: {user.email}, Active: {user.is_active}")
@@ -3942,30 +4033,89 @@ class EmailLoginView(APIView):
             except Profile.DoesNotExist:
                 logger.warning(f"User not found - Email: {email}, Phone: {email}")
                 return Response(
-                    {"detail": "Неверные учетные данные"},
+                    {
+                        "detail": "Пользователь с указанным email или номером телефона не найден",
+                        "error_code": "USER_NOT_FOUND"
+                    },
                     status=status.HTTP_401_UNAUTHORIZED,
                 )
 
         if not user.check_password(password):
             logger.warning(f"Invalid password for user: {user.email}")
             return Response(
-                {"detail": "Неверные учетные данные"},
+                {
+                    "detail": "Неверный пароль",
+                    "error_code": "INVALID_PASSWORD"
+                },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
+        
         if not user.is_active:
+            logger.warning(f"Inactive user login attempt: {user.email}")
             return Response(
-                {"detail": "Пользователь деактивирован"},
+                {
+                    "detail": "Ваш аккаунт деактивирован. Обратитесь в поддержку для восстановления доступа.",
+                    "error_code": "ACCOUNT_DEACTIVATED"
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         # Check Role Eligibility
-        if role == "SELLER" and not _safe_has_producer(user):
-            return Response(
-                {
-                    "detail": "У вас нет профиля продавца. Пожалуйста, зарегистрируйтесь как продавец."
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        producer_created = False  # Флаг для отслеживания автоматического создания Producer
+        if role == "SELLER":
+            has_producer = _safe_has_producer(user)
+            logger.info(f"SELLER login check - User: {user.email}, Has producer: {has_producer}")
+            
+            # Дополнительная диагностика - проверяем Producer в базе данных
+            from api.models import Producer
+            producer_exists = Producer.objects.filter(user=user).exists()
+            logger.info(f"SELLER login check - Producer exists in DB: {producer_exists}")
+            
+            if not has_producer:
+                logger.info(f"User {user.email} attempted SELLER login without producer profile - attempting auto-creation")
+                
+                # Автоматическое создание Producer профиля
+                shop_name = f"Магазин {user.first_name or user.email.split('@')[0]}"
+                success, producer, message = _create_producer_for_user(user, shop_name=shop_name)
+                
+                if not success:
+                    logger.error(f"Failed to auto-create Producer for user {user.email}: {message}")
+                    return Response(
+                        {
+                            "detail": f"Не удалось создать профиль продавца: {message}",
+                            "error_code": "SELLER_PROFILE_CREATION_FAILED"
+                        },
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+                
+                logger.info(f"Successfully auto-created Producer for user {user.email}: {message}")
+                # Обновляем флаг наличия producer
+                has_producer = True
+                producer_created = True
+            # Дополнительная проверка статуса профиля продавца
+            try:
+                producer = user.producer
+                if producer.is_banned:
+                    logger.warning(f"User {user.email} attempted SELLER login with banned producer profile")
+                    return Response(
+                        {
+                            "detail": "Ваш профиль продавца заблокирован. Обратитесь в поддержку.",
+                            "error_code": "SELLER_PROFILE_BANNED"
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+                if producer.is_hidden:
+                    logger.warning(f"User {user.email} attempted SELLER login with hidden producer profile")
+                    return Response(
+                        {
+                            "detail": "Ваш профиль продавца временно недоступен. Обратитесь в поддержку.",
+                            "error_code": "SELLER_PROFILE_HIDDEN"
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            except Exception:
+                # Если producer не существует, ошибка уже обработана выше
+                pass
 
         # Check 2FA
         try:
@@ -4054,30 +4204,52 @@ class EmailLoginView(APIView):
 
         track_device(user, request)
 
-        return Response(
-            {
-                "access": str(refresh.access_token),
-                "refresh": str(refresh),
-                "role": role,
-                "is_seller": _safe_has_producer(user),
-                "user": {
-                    "email": user.email,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                },
+        # Формируем ответ
+        response_data = {
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "role": role,
+            "is_seller": _safe_has_producer(user),
+            "user": {
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
             },
-            status=status.HTTP_200_OK,
-        )
+        }
+        
+        # Добавляем информацию о создании Producer, если это произошло
+        if producer_created:
+            response_data["producer_created"] = True
+            response_data["producer_name"] = user.producer.name if hasattr(user, "producer") else None
+            logger.info(f"Login response includes producer_created=True for user {user.email}")
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class Verify2FALoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        
         email = request.data.get("email")
         code = request.data.get("code")
         role = request.data.get("role", "CLIENT")
         User = get_user_model()
+
+        # Валидация входных данных
+        if not email:
+            return Response(
+                {"detail": "Email или номер телефона обязателен", "error_code": "EMAIL_REQUIRED"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        if not code:
+            return Response(
+                {"detail": "Код подтверждения обязателен", "error_code": "CODE_REQUIRED"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             user = User.objects.get(email__iexact=email)
@@ -4087,18 +4259,62 @@ class Verify2FALoginView(APIView):
                 profile = Profile.objects.get(phone=email)
                 user = profile.user
             except Profile.DoesNotExist:
+                logger.warning(f"Verify2FA - User not found: {email}")
                 return Response(
-                    {"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND
+                    {"detail": "Пользователь не найден", "error_code": "USER_NOT_FOUND"},
+                    status=status.HTTP_404_NOT_FOUND,
                 )
 
         # Check Role Eligibility
-        if role == "SELLER" and not _safe_has_producer(user):
-            return Response(
-                {
-                    "detail": "У вас нет профиля продавца. Пожалуйста, зарегистрируйтесь как продавец."
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        producer_created = False  # Флаг для отслеживания автоматического создания Producer
+        if role == "SELLER":
+            has_producer = _safe_has_producer(user)
+            logger.info(f"Verify2FA - SELLER login check - User: {user.email}, Has producer: {has_producer}")
+            
+            if not has_producer:
+                logger.info(f"Verify2FA - User {user.email} attempted SELLER login without producer profile - attempting auto-creation")
+                
+                # Автоматическое создание Producer профиля
+                shop_name = f"Магазин {user.first_name or user.email.split('@')[0]}"
+                success, producer, message = _create_producer_for_user(user, shop_name=shop_name)
+                
+                if not success:
+                    logger.error(f"Verify2FA - Failed to auto-create Producer for user {user.email}: {message}")
+                    return Response(
+                        {
+                            "detail": f"Не удалось создать профиль продавца: {message}",
+                            "error_code": "SELLER_PROFILE_CREATION_FAILED"
+                        },
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+                
+                logger.info(f"Verify2FA - Successfully auto-created Producer for user {user.email}: {message}")
+                has_producer = True
+                producer_created = True
+            
+            # Проверка статуса профиля продавца
+            try:
+                producer = user.producer
+                if producer.is_banned:
+                    logger.warning(f"Verify2FA - User {user.email} attempted SELLER login with banned producer profile")
+                    return Response(
+                        {
+                            "detail": "Ваш профиль продавца заблокирован. Обратитесь в поддержку.",
+                            "error_code": "SELLER_PROFILE_BANNED"
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+                if producer.is_hidden:
+                    logger.warning(f"Verify2FA - User {user.email} attempted SELLER login with hidden producer profile")
+                    return Response(
+                        {
+                            "detail": "Ваш профиль продавца временно недоступен. Обратитесь в поддержку.",
+                            "error_code": "SELLER_PROFILE_HIDDEN"
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            except Exception:
+                pass
 
         verification = (
             VerificationCode.objects.filter(user=user, code=code, is_used=False)
@@ -4115,16 +4331,27 @@ class Verify2FALoginView(APIView):
             refresh.access_token["role"] = role
 
             track_device(user, request)
-            return Response(
-                {
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh),
-                    "role": role,
-                },
-                status=status.HTTP_200_OK,
-            )
+            
+            # Формируем ответ
+            response_data = {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "role": role,
+            }
+            
+            # Добавляем информацию о создании Producer, если это произошло
+            if producer_created:
+                response_data["producer_created"] = True
+                response_data["producer_name"] = user.producer.name if hasattr(user, "producer") else None
+                logger.info(f"Verify2FA response includes producer_created=True for user {user.email}")
+            
+            return Response(response_data, status=status.HTTP_200_OK)
 
-        return Response({"detail": "Invalid code"}, status=status.HTTP_400_BAD_REQUEST)
+        logger.warning(f"Verify2FA - Invalid or expired code for user: {user.email}")
+        return Response(
+            {"detail": "Неверный или истекший код подтверждения", "error_code": "INVALID_OR_EXPIRED_CODE"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 class ResendCodeView(APIView):
@@ -4339,13 +4566,18 @@ class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        
         token = request.data.get("token")
         role = str(request.data.get("role") or "CLIENT").upper()
         if role not in ("CLIENT", "SELLER"):
             role = "CLIENT"
+        
         if not token:
             return Response(
-                {"detail": "Token is required"}, status=status.HTTP_400_BAD_REQUEST
+                {"detail": "Токен Google обязателен", "error_code": "TOKEN_REQUIRED"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
@@ -4364,7 +4596,11 @@ class GoogleLoginView(APIView):
                 # Specify the CLIENT_ID of the app that accesses the backend:
                 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
                 if not CLIENT_ID:
-                    print("WARNING: GOOGLE_CLIENT_ID not set in env")
+                    logger.warning("GOOGLE_CLIENT_ID not set in env")
+                    return Response(
+                        {"detail": "Ошибка конфигурации Google OAuth. Обратитесь к администратору.", "error_code": "GOOGLE_CONFIG_ERROR"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
 
                 # Verify the token
                 id_info = id_token.verify_oauth2_token(
@@ -4378,7 +4614,7 @@ class GoogleLoginView(APIView):
 
             if not email:
                 return Response(
-                    {"detail": "Email not found in Google token"},
+                    {"detail": "Email не найден в токене Google", "error_code": "EMAIL_NOT_IN_TOKEN"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -4403,21 +4639,49 @@ class GoogleLoginView(APIView):
                 shop_name = f"{first_name} {last_name}".strip() or "Новый продавец"
                 moderation = moderate_shop_name(shop_name)
                 if not moderation.get("approved"):
+                    reason = moderation.get("reason", "unknown")
+                    logger.warning(f"Google login - Shop name moderation failed for {email}: {reason}")
                     return Response(
-                        {"detail": "Название магазина не прошло модерацию"},
+                        {"detail": "Название магазина не прошло модерацию", "error_code": "SHOP_NAME_MODERATION_FAILED"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
                 Producer.objects.create(user=user, name=shop_name, city="Москва")
 
             # Check Role Eligibility
-            if role == "SELLER" and not _safe_has_producer(user):
-                return Response(
-                    {
-                        "detail": "У вас нет профиля продавца. Пожалуйста, зарегистрируйтесь как продавец."
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            if role == "SELLER":
+                if not _safe_has_producer(user):
+                    logger.warning(f"Google login - User {user.email} attempted SELLER login without producer profile")
+                    return Response(
+                        {
+                            "detail": "У вас нет профиля продавца. Пожалуйста, зарегистрируйтесь как продавец.",
+                            "error_code": "SELLER_PROFILE_NOT_FOUND"
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+                # Проверка статуса профиля продавца
+                try:
+                    producer = user.producer
+                    if producer.is_banned:
+                        logger.warning(f"Google login - User {user.email} attempted SELLER login with banned producer profile")
+                        return Response(
+                            {
+                                "detail": "Ваш профиль продавца заблокирован. Обратитесь в поддержку.",
+                                "error_code": "SELLER_PROFILE_BANNED"
+                            },
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+                    if producer.is_hidden:
+                        logger.warning(f"Google login - User {user.email} attempted SELLER login with hidden producer profile")
+                        return Response(
+                            {
+                                "detail": "Ваш профиль продавца временно недоступен. Обратитесь в поддержку.",
+                                "error_code": "SELLER_PROFILE_HIDDEN"
+                            },
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+                except Exception:
+                    pass
 
             # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
@@ -4443,13 +4707,15 @@ class GoogleLoginView(APIView):
 
         except ValueError as e:
             # Invalid token
+            logger.warning(f"Google login - Invalid token: {str(e)}")
             return Response(
-                {"detail": f"Invalid Google token: {str(e)}"},
+                {"detail": "Неверный токен Google", "error_code": "INVALID_GOOGLE_TOKEN"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
+            logger.error(f"Google login failed: {str(e)}")
             return Response(
-                {"detail": f"Google login failed: {str(e)}"},
+                {"detail": "Ошибка входа через Google. Попробуйте позже.", "error_code": "GOOGLE_LOGIN_ERROR"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

@@ -29,8 +29,9 @@ export default function SellerHeader() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-[#e5e7eb] shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header
+      className="sticky top-0 z-50 bg-white border-b border-[#e5e7eb] shadow-sm max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+    >
         <div className="flex items-center justify-between h-16">
           {/* Left Side: Navigation Tabs */}
           <nav className="flex space-x-1 overflow-x-auto no-scrollbar py-2">
@@ -71,7 +72,6 @@ export default function SellerHeader() {
              </button>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
   );
 }

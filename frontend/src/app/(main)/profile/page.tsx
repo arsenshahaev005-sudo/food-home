@@ -352,13 +352,13 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4 relative bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-xl">
+    <div className="max-w-3xl mx-auto py-8 px-4 relative bg-white rounded-2xl shadow-xl">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold" style={{ color: "#4b2f23" }}>Настройки профиля</h1>
-        
+
         <div className="flex items-center gap-4">
             {profile?.role === 'SELLER' && (
-                <Link 
+                <Link
                     href="/seller"
                     className="text-sm font-medium px-4 py-2 bg-[#c9825b] text-white rounded-full hover:bg-[#a06646] transition-colors"
                 >
@@ -367,7 +367,7 @@ export default function ProfilePage() {
             )}
 
             {/* Notification Bell */}
-            <button 
+            <button
             onClick={() => {
                 setShowNotifications(!showNotifications);
                 if (!showNotifications) {
@@ -375,7 +375,7 @@ export default function ProfilePage() {
                     if (token) markAllNotificationsRead(token).then(() => loadNotifications(token));
                 }
             }}
-            className="relative p-2 rounded-full hover:bg-gray-100 transition-all duration-300 hover:scale-110 active:scale-95"
+            className="relative p-2 rounded-full hover:bg-[#fff5f0] transition-all duration-300 hover:scale-110 active:scale-95"
             >
 
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#4b2f23" className="w-7 h-7 transition-transform duration-300 group-hover:rotate-12">
@@ -414,9 +414,9 @@ export default function ProfilePage() {
       
       {/* Quick Navigation Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <Link 
-          href="/orders" 
-          className="flex items-center gap-4 p-5 bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-100 shadow-xl hover:shadow-md hover:border-[#c9825b]/30 transition-all group"
+        <Link
+          href="/orders"
+          className="flex items-center gap-4 p-5 bg-[#fcf8f3] rounded-2xl border border-[#e8dccf] shadow-xl hover:shadow-md hover:border-[#c9825b]/30 transition-all group"
         >
           <div className="w-12 h-12 rounded-2xl bg-[#fff5f0] flex items-center justify-center text-[#c9825b] group-hover:scale-110 transition-transform">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
@@ -424,17 +424,17 @@ export default function ProfilePage() {
             </svg>
           </div>
           <div>
-            <div className="font-black text-gray-900">Мои заказы</div>
-            <div className="text-xs text-gray-500 font-medium">История покупок и статус заказов</div>
+            <div className="font-black text-[#4b2f23]">Мои заказы</div>
+            <div className="text-xs text-[#7c6b62] font-medium">История покупок и статус заказов</div>
           </div>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 ml-auto text-gray-300 group-hover:text-[#c9825b] group-hover:translate-x-1 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 ml-auto text-[#e8dccf] group-hover:text-[#c9825b] group-hover:translate-x-1 transition-all">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
           </svg>
         </Link>
 
-        <Link 
-          href="/cart" 
-          className="flex items-center gap-4 p-5 bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-100 shadow-xl hover:shadow-md hover:border-[#c9825b]/30 transition-all group"
+        <Link
+          href="/cart"
+          className="flex items-center gap-4 p-5 bg-[#fcf8f3] rounded-2xl border border-[#e8dccf] shadow-xl hover:shadow-md hover:border-[#c9825b]/30 transition-all group"
         >
           <div className="w-12 h-12 rounded-2xl bg-[#fff5f0] flex items-center justify-center text-[#c9825b] group-hover:scale-110 transition-transform">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
@@ -442,17 +442,17 @@ export default function ProfilePage() {
             </svg>
           </div>
           <div>
-            <div className="font-black text-gray-900">Корзина</div>
-            <div className="text-xs text-gray-500 font-medium">Перейти к оформлению заказа</div>
+            <div className="font-black text-[#4b2f23]">Корзина</div>
+            <div className="text-xs text-[#7c6b62] font-medium">Перейти к оформлению заказа</div>
           </div>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 ml-auto text-gray-300 group-hover:text-[#c9825b] group-hover:translate-x-1 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 ml-auto text-[#e8dccf] group-hover:text-[#c9825b] group-hover:translate-x-1 transition-all">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
           </svg>
         </Link>
       </div>
-      
-      <div 
-        className="p-6 rounded-2xl space-y-6 bg-gray-800/50 backdrop-blur-sm shadow-xl"
+
+      <div
+        className="p-6 rounded-2xl space-y-6 bg-[#fcf8f3] shadow-xl"
       >
         {/* Personal Data */}
         <div className="pb-6 border-b border-gray-100">
@@ -461,13 +461,13 @@ export default function ProfilePage() {
             }}>
                 <div>
                 <div className="font-medium text-lg group-hover:text-[#c9825b] transition-colors" style={{ color: "#4b2f23" }}>Личные данные</div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-[#7c6b62]">
                         {profile?.first_name} {profile?.last_name}
                         <span className="mx-2">•</span>
                         <span className="text-[#c9825b] font-medium">{profile?.role === 'SELLER' ? 'Продавец' : 'Покупатель'}</span>
                     </div>
                 </div>
-                <div className={`text-sm font-medium px-3 py-1 rounded-full transition-colors ${activeSection === 'personal' ? 'bg-gray-100 text-gray-600' : 'bg-[#fff5f0] text-[#c9825b]'}`}>
+                <div className={`text-sm font-medium px-3 py-1 rounded-full transition-colors ${activeSection === 'personal' ? 'bg-[#e8dccf] text-[#4b2f23]' : 'bg-[#fff5f0] text-[#c9825b]'}`}>
                     {activeSection === 'personal' ? 'Свернуть' : 'Изменить'}
                 </div>
             </div>
@@ -475,13 +475,13 @@ export default function ProfilePage() {
                     {activeSection === 'personal' && (
                 <div className="mt-4 space-y-4">
                     {/* Name */}
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between items-center p-3 bg-[#fff5f0] rounded-lg">
                         <div>
-                            <div className="text-xs text-gray-500">Имя и Фамилия</div>
-                            <div className="font-medium">{profile?.first_name} {profile?.last_name}</div>
+                            <div className="text-xs text-[#7c6b62]">Имя и Фамилия</div>
+                            <div className="font-medium text-[#4b2f23]">{profile?.first_name} {profile?.last_name}</div>
                         </div>
-                        <button 
-                            onClick={() => startEditing('NAME')} 
+                        <button
+                            onClick={() => startEditing('NAME')}
                             onMouseEnter={() => setIsNameChangeHovered(true)}
                             onMouseLeave={() => setIsNameChangeHovered(false)}
                             className="text-sm font-medium px-4 py-1.5 rounded-full transition-colors duration-300"
@@ -496,13 +496,13 @@ export default function ProfilePage() {
 
                     {/* Shop Name for Sellers */}
                     {profile?.role === 'SELLER' && (
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-center p-3 bg-[#fff5f0] rounded-lg">
                             <div>
-                                <div className="text-xs text-gray-500">Название магазина</div>
-                                <div className="font-medium">{profile?.shop_name || 'Не указано'}</div>
+                                <div className="text-xs text-[#7c6b62]">Название магазина</div>
+                                <div className="font-medium text-[#4b2f23]">{profile?.shop_name || 'Не указано'}</div>
                             </div>
-                            <button 
-                                onClick={() => startEditing('SHOP_NAME')} 
+                            <button
+                                onClick={() => startEditing('SHOP_NAME')}
                                 onMouseEnter={() => setIsShopNameChangeHovered(true)}
                                 onMouseLeave={() => setIsShopNameChangeHovered(false)}
                                 className="text-sm font-medium px-4 py-1.5 rounded-full transition-colors duration-300"
@@ -518,13 +518,13 @@ export default function ProfilePage() {
 
                     {profile?.auth_provider !== 'GOOGLE' && (
                       <>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-center p-3 bg-[#fff5f0] rounded-lg">
                           <div>
-                            <div className="text-xs text-gray-500">Email</div>
-                            <div className="font-medium">{profile?.email}</div>
+                            <div className="text-xs text-[#7c6b62]">Email</div>
+                            <div className="font-medium text-[#4b2f23]">{profile?.email}</div>
                           </div>
-                          <button 
-                            onClick={() => startEditing('EMAIL')} 
+                          <button
+                            onClick={() => startEditing('EMAIL')}
                             onMouseEnter={() => setIsEmailChangeHovered(true)}
                             onMouseLeave={() => setIsEmailChangeHovered(false)}
                             className="text-sm font-medium px-4 py-1.5 rounded-full transition-colors duration-300"
@@ -536,13 +536,13 @@ export default function ProfilePage() {
                             Изменить
                           </button>
                         </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-center p-3 bg-[#fff5f0] rounded-lg">
                           <div>
-                            <div className="text-xs text-gray-500">Телефон</div>
-                            <div className="font-medium">{profile?.phone || 'Не указан'}</div>
+                            <div className="text-xs text-[#7c6b62]">Телефон</div>
+                            <div className="font-medium text-[#4b2f23]">{profile?.phone || 'Не указан'}</div>
                           </div>
-                          <button 
-                            onClick={() => startEditing('PHONE')} 
+                          <button
+                            onClick={() => startEditing('PHONE')}
                             onMouseEnter={() => setIsPhoneChangeHovered(true)}
                             onMouseLeave={() => setIsPhoneChangeHovered(false)}
                             className="text-sm font-medium px-4 py-1.5 rounded-full transition-colors duration-300"

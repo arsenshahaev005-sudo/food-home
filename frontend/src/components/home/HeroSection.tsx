@@ -43,7 +43,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
 
   return (
     <section
-      className="relative min-h-[600px] flex items-center justify-center bg-gradient-to-br from-amber-900 to-orange-950 rounded-3xl shadow-2xl overflow-hidden pt-6"
+      className="relative min-h-[600px] flex items-center justify-center bg-gradient-to-br from-[#4b2f23] to-[#CD845B] rounded-3xl shadow-2xl overflow-hidden pt-6"
       aria-labelledby="hero-title"
     >
       {/* Background Pattern */}
@@ -68,7 +68,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
               {subtitle}
             </p>
             
-            <p className="text-lg text-gray-200 mb-8 max-w-2xl mx-auto lg:mx-0">
+            <p className="text-lg text-[#fcf8f3] mb-8 max-w-2xl mx-auto lg:mx-0">
               {description}
             </p>
 
@@ -122,7 +122,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                   <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
-                <span className="text-gray-200 font-medium">Свежие продукты</span>
+                <span className="text-[#fcf8f3] font-medium">Свежие продукты</span>
               </div>
               
               <div className="flex items-center gap-2">
@@ -140,7 +140,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                   <circle cx="12" cy="12" r="10"></circle>
                   <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-                <span className="text-gray-200 font-medium">Быстрая доставка</span>
+                <span className="text-[#fcf8f3] font-medium">Быстрая доставка</span>
               </div>
               
               <div className="flex items-center gap-2">
@@ -157,7 +157,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                 >
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                 </svg>
-                <span className="text-gray-200 font-medium">С любовью</span>
+                <span className="text-[#fcf8f3] font-medium">С любовью</span>
               </div>
             </div>
           </div>

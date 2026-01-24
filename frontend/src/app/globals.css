@@ -59,19 +59,7 @@
 
 /* removed @theme inline to satisfy CSS diagnostics */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #E8DDD2;
-    --foreground: #4b2f23;
-    --text-secondary: #7c6b62;
-    --accent: #c9825b;
-    --accent-2: #b46a45;
-    --muted: #efe3d6;
-    --card: #fcf8f3;
-    --border-warm: #e8dccf;
-    --shadow-color: rgba(185, 135, 90, 0.25);
-  }
-}
+/* Dark mode from browser preferences disabled - only class-based dark mode is supported */
 
 body {
   background: rgb(232, 221, 210);

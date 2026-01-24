@@ -128,8 +128,8 @@ export default function CategoriesMegaMenu({ categories, placeholders, subcats }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 relative">
-      <div className="flex items-baseline justify-between h-10 md:h-12">
+    <div className="w-full space-y-4 relative">
+      <div className="flex justify-between items-center h-10 md:h-12">
         <h2 className="text-xl md:text-2xl font-semibold">Категории</h2>
         <button ref={btnRef} type="button" className="btn-warm" onClick={() => setOpen((v) => !v)}>
           Показать все

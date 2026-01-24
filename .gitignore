@@ -91,3 +91,6 @@ backend/media/
 # Temporary files
 flake8_report.txt
 *.tmp
+
+
+.next/
