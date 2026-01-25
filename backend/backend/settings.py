@@ -22,8 +22,8 @@ INSTALLED_APPS = [
     'corsheaders',
     # Keep old api app for backward compatibility during migration
     'api',
-    # New domain-based apps - TODO: Раскомментировать после миграции
-    # 'apps.users',  # Конфликт с auth.User - требует настройки AUTH_USER_MODEL
+    # New domain-based apps
+    'apps.users',
     'apps.catalog',
     'apps.orders',
     'apps.producers',
@@ -62,6 +62,9 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
+
+# Custom user model
+AUTH_USER_MODEL = 'users.User'
 
 # Database: PostgreSQL via env vars, fallback to SQLite for local/dev
 if os.getenv('DB_NAME') and os.getenv('DB_USER'):

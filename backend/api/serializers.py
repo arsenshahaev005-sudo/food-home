@@ -572,21 +572,47 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = get_user_model()
-        fields = ["id", "email", "password"]
-
-    def validate_email(self, value):
-        User = get_user_model()
-        if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError("Email уже используется")
-        return value
+        fields = ["id", "username", "email", "password"]
 
     def create(self, validated_data):
         User = get_user_model()
         email = validated_data.get("email")
         password = validated_data.get("password")
-        user = User(username=email, email=email)
-        user.set_password(password)
-        user.save()
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=password
+        )
+        return user
+
+
+class RegistrationSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    
+    class Meta:
+        model = get_user_model()
+        fields = ["username", "email", "password", "first_name"]
+        extra_kwargs = {
+            'first_name': {'required': True},
+        }
+    
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("Пароль должен содержать минимум 8 символов")
+        return value
+    
+    def create(self, validated_data):
+        User = get_user_model()
+        email = validated_data.get("email")
+        password = validated_data.get("password")
+        first_name = validated_data.get("first_name", "")
+        
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=password,
+            first_name=first_name
+        )
         return user
 
 

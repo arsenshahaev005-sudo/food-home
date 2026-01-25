@@ -1,4 +1,4 @@
-import { apiGetAuth } from '../api';
+import { apiGetAuth, BASE_URL } from '../api';
 
 export interface Category {
   id: string;
@@ -39,10 +39,27 @@ export interface MetaTags {
 }
 
 /**
- * Получить все категории
+ * Получить все категории (публичный доступ)
  */
-export const getCategories = async (token: string): Promise<Category[]> => {
-  return apiGetAuth<Category[]>('/api/categories/', token);
+export const getCategories = async (token?: string): Promise<Category[]> => {
+  if (token) {
+    return apiGetAuth<Category[]>('/api/categories/', token);
+  }
+  
+  // Публичный доступ без токена
+  const response = await fetch(`${BASE_URL}/api/categories/`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+  
+  return response.json();
 };
 
 /**

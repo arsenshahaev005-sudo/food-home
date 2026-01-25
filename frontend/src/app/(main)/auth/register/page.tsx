@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { register, verifyRegistration, resendCode, googleLogin } from "@/lib/api";
+import { register, verifyRegistration, resendCode, googleLogin } from "@/lib/authApi";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';

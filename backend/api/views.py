@@ -28,6 +28,9 @@ from django.conf import settings
 from rest_framework.decorators import action
 from datetime import timedelta
 from django.utils import timezone
+import logging
+
+logger = logging.getLogger(__name__)
 from django.db import models
 from django.db.models import Sum, Count, Avg
 from django.db.models.functions import TruncDate
@@ -68,6 +71,7 @@ from .serializers import (
     CategorySerializer,
     OrderSerializer,
     UserSerializer,
+    RegistrationSerializer,
     AddressSerializer,
     CartSerializer,
     ChatMessageSerializer,
@@ -2753,6 +2757,9 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # Логирование входящих данных для диагностики
+        logger.info(f"RegisterView: Received registration request with data: {request.data}")
+        
         email = request.data.get("email", "").strip()
         phone = request.data.get("phone")
         if phone:
@@ -2762,10 +2769,19 @@ class RegisterView(APIView):
         last_name = request.data.get("last_name", "")
         shop_name = request.data.get("shop_name", "")
         role = request.data.get("role", "CLIENT")
+        
+        logger.info(f"RegisterView: Parsed data - email={email}, phone={phone}, role={role}, first_name={first_name}, shop_name={shop_name}")
 
         if not email:
             return Response(
                 {"detail": "Email обязателен для заполнения"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Валидация сложности пароля
+        if password and len(password) < 8:
+            return Response(
+                {"detail": "Пароль должен содержать минимум 8 символов"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -2775,15 +2791,12 @@ class RegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        print(f"DEBUG: Register attempt: email={email}, role={role}")
-
         # Check if user with this email or phone already exists in active users
         existing_user = get_user_model().objects.filter(email__iexact=email).first()
         is_upgrade_flow = False
 
         if existing_user:
             has_producer = _safe_has_producer(existing_user)
-            print(f"DEBUG: User exists: {existing_user}, has_producer={has_producer}")
             # Allow existing users to register as SELLER if they are not already
             if role == "SELLER" and not has_producer:
                 is_upgrade_flow = True
@@ -2832,8 +2845,10 @@ class RegisterView(APIView):
 
         # Validate basic data with serializer (without saving)
         if not is_upgrade_flow:
-            serializer = UserSerializer(data=request.data)
+            serializer = RegistrationSerializer(data=request.data)
             if not serializer.is_valid():
+                logger.error(f"RegisterView: Serializer validation failed. Errors: {serializer.errors}")
+                logger.error(f"RegisterView: Request data that failed validation: {request.data}")
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -2885,11 +2900,6 @@ class RegisterView(APIView):
                 print(f"============================================")
                 print(f"REGISTER EMAIL CODE for {email}: {code}")
                 print(f"============================================")
-                if getattr(settings, "DEBUG", False):
-                    return Response(
-                        {"email": email, "detail": "Verification code sent"},
-                        status=status.HTTP_200_OK,
-                    )
                 return Response(
                     {
                         "detail": "Ошибка отправки email. Проверьте адрес или попробуйте позже."
@@ -4119,7 +4129,7 @@ class EmailLoginView(APIView):
 
         # Check 2FA
         try:
-            profile = user.profile
+            profile, _ = Profile.objects.get_or_create(user=user)
             if profile.is_2fa_enabled:
                 code = str(random.randint(100000, 999999))
                 # Store role in VerificationCode context if needed?

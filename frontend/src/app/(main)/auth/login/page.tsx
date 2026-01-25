@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { login, verifyLogin2FA, resendCode, googleLogin } from "@/lib/api";
+import { login, verifyLogin2FA, resendCode, googleLogin } from "@/lib/authApi";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import "@/app/globals.css"; // Ensure global styles are available if needed for overrides
@@ -203,14 +203,14 @@ function LoginForm() {
                 <div className="mt-2 relative">
                   {loginMethod === "phone" ? (
                     <div className="rounded-full shadow-sm ring-1 ring-inset ring-gray-300 focus-within:ring-2 focus-within:ring-inset focus-within:ring-[#c9825b] bg-transparent">
-                      <PhoneInput
-                        international
-                        defaultCountry="RU"
-                        value={phoneNumber}
-                        onChange={setPhoneNumber}
-                        className="phone-input-custom px-4 py-2.5 w-full bg-transparent"
-                        placeholder="Номер телефона"
-                      />
+                        <PhoneInput
+                          international
+                          defaultCountry="RU"
+                          value={phoneNumber}
+                          onChange={setPhoneNumber}
+                          className="phone-input-custom px-4 py-2.5 w-full bg-transparent"
+                          placeholder="Номер телефона"
+                        />
                     </div>
                   ) : (
                     <div className="relative">
@@ -250,7 +250,7 @@ function LoginForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="block w-full rounded-full border-0 py-2.5 pl-10 pr-10 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-[#c9825b]"
-                    placeholder="••••••••"
+                    placeholder="•••••••"
                   />
                   <button
                     type="button"
