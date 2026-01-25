@@ -3,6 +3,10 @@
 export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_BASE_URL = BASE_URL;
 
+// Import Order type from types/api and re-export it
+import type { Order } from '../types/api';
+export type { Order } from '../types/api';
+
 // Helper functions for authenticated requests
 export const apiGetAuth = async <T>(url: string, token: string): Promise<T> => {
   const response = await fetch(`${API_BASE_URL}${url}`, {
@@ -531,6 +535,28 @@ export const estimateOrder = async (items: OrderEstimateItem[]): Promise<OrderEs
   }
   
   return response.json();
+};
+
+/**
+ * Получить список заказов для текущего пользователя
+ */
+export const getOrders = async (token: string): Promise<Order[]> => {
+  const response = await fetch(`${API_BASE_URL}/api/v1/orders/`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+  
+  const data = await response.json();
+  // API returns { results: Order[] } format
+  return data.results || data;
 };
 
 export default api;

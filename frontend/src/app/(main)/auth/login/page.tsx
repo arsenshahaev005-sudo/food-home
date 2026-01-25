@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { login, verifyLogin2FA, resendCode, googleLogin } from "@/lib/authApi";
+import { saveAuthTokens } from "@/lib/cookies";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import "@/app/globals.css"; // Ensure global styles are available if needed for overrides
@@ -35,11 +36,7 @@ function LoginForm() {
       setError(null);
       try {
         const res = await googleLogin(tokenResponse.access_token, role);
-        const maxAge = rememberMe ? 2592000 : 86400;
-        document.cookie = `accessToken=${res.access}; path=/; max-age=${maxAge}`;
-        if (res.refresh) {
-          document.cookie = `refreshToken=${res.refresh}; path=/; max-age=${maxAge}`;
-        }
+        saveAuthTokens(res.access, res.refresh || '', rememberMe);
         router.push("/profile");
         router.refresh();
       } catch (err: any) {
@@ -84,11 +81,7 @@ function LoginForm() {
              setMaskedDestination(emailVal ? emailVal.replace(/(.{2})(.*)(@.*)/, "$1***$3") : identifier);
         }
       } else if (res.access) {
-        const maxAge = rememberMe ? 2592000 : 86400;
-        document.cookie = `accessToken=${res.access}; path=/; max-age=${maxAge}`;
-        if (res.refresh) {
-          document.cookie = `refreshToken=${res.refresh}; path=/; max-age=${maxAge}`;
-        }
+        saveAuthTokens(res.access, res.refresh || '', rememberMe);
         
         if (res.role === 'SELLER') {
             router.push("/seller");
@@ -110,11 +103,7 @@ function LoginForm() {
     setError(null);
     try {
       const res = await verifyLogin2FA(emailFor2FA, verificationCode);
-      const maxAge = rememberMe ? 2592000 : 86400;
-      document.cookie = `accessToken=${res.access}; path=/; max-age=${maxAge}`;
-      if (res.refresh) {
-        document.cookie = `refreshToken=${res.refresh}; path=/; max-age=${maxAge}`;
-      }
+      saveAuthTokens(res.access, res.refresh || '', rememberMe);
       
       if (res.role === 'SELLER') {
             router.push("/seller");

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { register, verifyRegistration, resendCode, googleLogin } from "@/lib/authApi";
+import { saveAuthTokens } from "@/lib/cookies";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
@@ -38,7 +39,7 @@ function RegisterForm() {
       setError(null);
       try {
         const res = await googleLogin(tokenResponse.access_token, role);
-        document.cookie = `accessToken=${res.access}; path=/; max-age=86400`;
+        saveAuthTokens(res.access, res.refresh || '', false);
         router.push("/profile");
         router.refresh();
       } catch (err: any) {
@@ -109,7 +110,7 @@ function RegisterForm() {
     setError(null);
     try {
       const res = await verifyRegistration(formData.email, verificationCode);
-      document.cookie = `accessToken=${res.access}; path=/; max-age=86400`;
+      saveAuthTokens(res.access, res.refresh || '', false);
       if (res.role === 'SELLER') {
             router.push("/seller");
         } else {
