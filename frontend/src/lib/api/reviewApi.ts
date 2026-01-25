@@ -122,6 +122,13 @@ export interface Review {
   dish_additional_photos?: string[];
   seller_response?: string;
   seller_response_created_at?: string;
+  seller_answer?: string;
+  user?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  };
+  finished_photo?: string;
 }
 
 export interface ReviewFormData {

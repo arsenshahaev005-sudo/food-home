@@ -360,6 +360,16 @@ export type {
   HelpArticle,
 } from './api/faqApi';
 
+// Re-export review functions
+export {
+  getProducerReviews,
+} from './api/reviewApi';
+
+// Re-export review types
+export type {
+  Review,
+} from './api/reviewApi';
+
 // ============ Catalog API functions ============
 
 export interface Dish {

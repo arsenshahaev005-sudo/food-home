@@ -56,7 +56,8 @@ export default async function Page(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
   const visibleReviews = showAllReviews ? reviews : reviews.slice(0, 10);
-  const dishes: Dish[] = await getDishes({ producer: id, is_available: "true" }).catch(() => []);
+  const dishesResponse = await getDishes({ producer: id, is_available: true }).catch(() => ({ results: [], count: 0 }));
+  const dishes: Dish[] = dishesResponse?.results || [];
 
   const avgRating = reviews.length > 0 
     ? reviews.reduce((acc, r) => acc + (r.rating_taste + r.rating_appearance + r.rating_service) / 3, 0) / reviews.length 

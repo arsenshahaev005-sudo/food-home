@@ -11,6 +11,11 @@ interface ProducerDishesProps {
 }
 
 export default function ProducerDishes({ dishes, categories }: ProducerDishesProps) {
+  // Early return if dishes is not an array
+  if (!Array.isArray(dishes)) {
+    return null;
+  }
+
   const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [visibleByGroup, setVisibleByGroup] = useState<Record<string, number>>({});

@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { getProducerReviews, archiveChat, type Profile, type Review } from '@/lib/api';
+import { getProducerReviews, type Profile, type Review } from '@/lib/api';
+
+// Helper to get cookie value
+function getCookie(name: string) {
+  if (typeof document === "undefined") return "";
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(";").shift();
+}
 
 interface SellerReviewsProps {
   profile: Profile;
@@ -31,7 +39,14 @@ const SellerReviews: React.FC<SellerReviewsProps> = ({ profile }) => {
     setLoading(true);
     setError(null);
 
-    getProducerReviews(profile.producer_id)
+    const token = getCookie("accessToken");
+    if (!token) {
+      setError('Не авторизован');
+      setLoading(false);
+      return;
+    }
+
+    getProducerReviews(token, String(profile.producer_id))
       .then((data) => {
         setReviews(data || []);
       })

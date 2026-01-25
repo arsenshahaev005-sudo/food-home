@@ -238,7 +238,11 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
   }, [resendCooldown]);
 
   useEffect(() => {
-    getCategories().then(setCategories).catch(() => setCategories([]));
+    getCategories()
+      .then((data) => {
+        setCategories(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setCategories([]));
   }, []);
 
   const handleError = (e: any, defaultMsg: string) => {
@@ -579,7 +583,7 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
                                                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none transition-all duration-200 focus:ring-2 focus:ring-[#c9825b] focus:border-transparent appearance-none cursor-pointer"
                                                 >
                                                     <option value="">Выберите категорию</option>
-                                                    {categories.map((cat) => (
+                                                    {Array.isArray(categories) && categories.map((cat) => (
                                                         <option key={cat.id} value={cat.id}>
                                                             {cat.name}
                                                         </option>
