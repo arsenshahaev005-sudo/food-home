@@ -5,6 +5,7 @@
 import logging
 from decimal import Decimal
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
@@ -43,10 +44,10 @@ class PenaltyService:
             raise ValidationError("Order is required")
 
         # Увеличиваем consecutive_rejections
-        producer.consecutive_rejections += 1
+        producer.consecutive_rejections = F('consecutive_rejections') + 1
 
         # Увеличиваем penalty_points
-        producer.penalty_points += 1
+        producer.penalty_points = F('penalty_points') + 1
 
         # Рассчитываем штраф 30% от стоимости заказа
         penalty_amount = order.total_price * Decimal("0.30")
@@ -195,7 +196,8 @@ class PenaltyService:
             )
             logger.info(f"Ban notification sent to producer {producer.id}")
         except Exception as e:
-            logger.error(f"Failed to send ban notification: {e}")
+            logger.error(f"Failed to send ban notification: {e}", exc_info=True)
+            # Не перебрасываем, чтобы не прерывать основной процесс
 
     def _send_unban_notification(self, producer: Producer):
         """Отправляет уведомление о разбане продавцу."""

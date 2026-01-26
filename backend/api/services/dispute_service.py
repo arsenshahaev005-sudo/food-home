@@ -143,7 +143,11 @@ class DisputeService:
             if remaining > 0:
                 amount_to_refund = min(remaining, refund_amount)
                 if amount_to_refund > 0:
-                    self.payments.refund_payment(payment, amount=amount_to_refund)
+                    try:
+                        self.payments.refund_payment(payment, amount=amount_to_refund)
+                    except Exception as e:
+                        logger.error(f"Failed to refund for dispute {dispute.id}: {e}")
+                        raise  # Перебросить для отката транзакции
 
         profile = getattr(order.user, "profile", None)
         if profile:
@@ -349,6 +353,9 @@ class DisputeService:
             # Покупатель прав
             # Штраф 30% от заказа магазину
             penalty_amount = order.total_price * Decimal("0.30")
+            if producer.balance < penalty_amount:
+                logger.warning(f"Producer {producer.id} has insufficient balance for penalty")
+                penalty_amount = producer.balance  # Списываем все что есть
             producer.balance = producer.balance - penalty_amount
             producer.save(update_fields=["balance"])
 
@@ -451,5 +458,21 @@ class DisputeService:
         """
         Отправить уведомление магазину о претензии.
         """
-        # TODO: Реализовать отправку уведомления через NotificationService
+        from .notifications import NotificationService
+        from api.models import Notification
+
+        notification_service = NotificationService()
+
+        # Создать уведомление для продавца
+        if dispute.order and dispute.order.dish and dispute.order.dish.producer:
+            producer = dispute.order.dish.producer
+            if producer.user:
+                Notification.objects.create(
+                    user=producer.user,
+                    title="Новая претензия к заказу",
+                    message=f"Покупатель открыл спор по заказу #{dispute.order.id}",
+                    type="DISPUTE",
+                    link=f"/orders/{dispute.order.id}/",
+                )
+
         logger.info(f"Notification sent to producer about complaint {dispute.id}")

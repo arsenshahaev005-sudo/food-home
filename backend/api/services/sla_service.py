@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional
+import logging
 
 from django.db import transaction
 from django.utils import timezone
@@ -12,6 +13,8 @@ from .notifications import NotificationService
 from .penalties import PenaltyService
 from .payment_service import PaymentService
 from .rating_service import RatingService
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -157,27 +160,31 @@ class SLAService:
 
     @transaction.atomic
     def _cancel_with_sla(self, order: Order, phase: str, reason: str) -> Order:
-        now = self._now()
-        producer = getattr(order.dish, "producer", None)
-        order.status = "CANCELLED"
-        order.cancelled_at = now
-        order.cancelled_by = "SYSTEM"
-        order.cancelled_reason = reason
-        order.save(update_fields=["status", "cancelled_at", "cancelled_by", "cancelled_reason"])
-        if producer:
-            self.penalties.add_penalty(producer, 1)
-            self.rating.recalc_for_producer(producer)
-        self.finance.on_cancelled(order)
-        payment = order.current_payment
-        if payment and payment.status in [
-            Payment.Status.SUCCEEDED,
-            Payment.Status.PARTIALLY_REFUNDED,
-        ]:
-            remaining = payment.amount - payment.refunded_amount
-            if remaining > 0:
-                self.payments.refund_payment(payment, amount=remaining)
-        self.notifications.order_cancelled(order)
-        return order
+        try:
+            now = self._now()
+            producer = getattr(order.dish, "producer", None)
+            order.status = "CANCELLED"
+            order.cancelled_at = now
+            order.cancelled_by = "SYSTEM"
+            order.cancelled_reason = reason
+            order.save(update_fields=["status", "cancelled_at", "cancelled_by", "cancelled_reason"])
+            if producer:
+                self.penalties.add_penalty(producer, 1)
+                self.rating.recalc_for_producer(producer)
+            self.finance.on_cancelled(order)
+            payment = order.current_payment
+            if payment and payment.status in [
+                Payment.Status.SUCCEEDED,
+                Payment.Status.PARTIALLY_REFUNDED,
+            ]:
+                remaining = payment.amount - payment.refunded_amount
+                if remaining > 0:
+                    self.payments.refund_payment(payment, amount=remaining)
+            self.notifications.order_cancelled(order)
+            return order
+        except Exception as e:
+            logger.error(f"Failed to cancel order {order.id} with SLA: {e}", exc_info=True)
+            raise
 
     @transaction.atomic
     def track_delivery_completion(self, order: Order, actual_arrival_time):
@@ -192,6 +199,10 @@ class SLAService:
         """
         order.delivery_actual_arrival_at = actual_arrival_time
         order.save(update_fields=["delivery_actual_arrival_at"])
+
+        if not actual_arrival_time:
+            logger.warning(f"actual_arrival_time is None for order {order.id}")
+            return order
 
         # Рассчитываем опоздание
         expected_time = order.delivery_expected_at
@@ -246,6 +257,16 @@ class SLAService:
         """
         Отправить уведомление покупателю о праве отмены без потерь.
         """
-        # TODO: Реализовать отправку уведомления через NotificationService
+        from api.models import Notification
+
+        if order.user:
+            Notification.objects.create(
+                user=order.user,
+                title="Право на бесплатную отмену",
+                message=f"Заказ #{order.id} задерживается. Вы можете отменить его без штрафов.",
+                type="ORDER",
+                link=f"/orders/{order.id}/",
+            )
+
         logger.info(f"Notification sent to buyer about cancellation rights for order {order.id}")
 

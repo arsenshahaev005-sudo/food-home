@@ -1,4 +1,5 @@
 from decimal import Decimal
+import logging
 
 from django.db import transaction
 from django.utils import timezone
@@ -6,6 +7,8 @@ from django.utils import timezone
 from api.models import Order, Payment
 from .order_finance_service import OrderFinanceService
 from .payment_providers import BasePaymentProvider, DevFakePaymentProvider
+
+logger = logging.getLogger(__name__)
 
 
 class PaymentService:
@@ -28,12 +31,16 @@ class PaymentService:
             status=Payment.Status.INITIATED,
         )
 
-        provider_res = self.provider.init_payment(
-            payment_id=str(payment.id),
-            amount=amount,
-            description=f"Order {order.id}",
-            return_url=return_url,
-        )
+        try:
+            provider_res = self.provider.init_payment(
+                payment_id=str(payment.id),
+                amount=amount,
+                description=f"Order {order.id}",
+                return_url=return_url,
+            )
+        except Exception as e:
+            logger.error(f"Provider failed to init payment: {e}")
+            raise ValueError(f"Payment initialization failed: {str(e)}")
 
         payment.provider_payment_id = provider_res["provider_payment_id"]
         payment.provider_raw_response = provider_res.get("raw") or {}
@@ -87,6 +94,9 @@ class PaymentService:
             Payment.Status.PARTIALLY_REFUNDED,
         ]:
             raise ValueError("Payment not in refundable state")
+        max_refund = payment.amount - payment.refunded_amount
+        if amount > max_refund:
+            raise ValueError(f"Refund amount {amount} exceeds maximum refundable {max_refund}")
 
         if payment.provider_payment_id:
             provider_res = self.provider.refund(payment.provider_payment_id, amount)

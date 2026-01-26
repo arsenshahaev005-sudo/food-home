@@ -10,7 +10,7 @@ from django.utils import timezone
 from decimal import Decimal
 from typing import Dict, Optional, List
 
-from ..models import Order, OrderDraft, Dish, Producer
+from ..models import Order, OrderDraft, Dish, Producer, Profile
 from .penalty_service import PenaltyService
 from .notifications import NotificationService
 from .payment_service import PaymentService
@@ -77,6 +77,10 @@ class OrderService:
         Returns:
             OrderDraft: Созданный или обновленный черновик
         """
+        if quantity < 1:
+            raise ValueError("Quantity must be at least 1")
+        if delivery_price < 0:
+            raise ValueError("Delivery price cannot be negative")
         try:
             dish = Dish.objects.get(id=dish_id)
         except Dish.DoesNotExist:
@@ -378,7 +382,8 @@ class OrderService:
 
         # Формула: max_time + (second_max_time / 2)
         total_time = max_time + (second_max_time // 2)
-
+        if total_time == 0:
+            total_time = 1  # Минимальное время приготовления
         return total_time
 
     @transaction.atomic
@@ -487,6 +492,7 @@ class OrderService:
                 order.save(update_fields=["refund_amount"])
             except Exception as e:
                 logger.error(f"Failed to refund order {order.id}: {e}")
+                raise  # Перебросить исключение для отката транзакции
 
         # Отправляем уведомление покупателю
         notification_service = NotificationService()
@@ -620,9 +626,12 @@ class OrderService:
                 order.producer.save(update_fields=["balance"])
 
             # Увеличиваем unjustified_cancellations у покупателя
-            if hasattr(user, 'profile'):
-                user.profile.unjustified_cancellations += 1
-                user.profile.save(update_fields=["unjustified_cancellations"])
+            try:
+                profile = user.profile
+                profile.unjustified_cancellations += 1
+                profile.save(update_fields=["unjustified_cancellations"])
+            except Profile.DoesNotExist:
+                logger.warning(f"Profile not found for user {user.id}")
 
             # Возвращаем остаток денег покупателю
             refund_amount = order.total_price - compensation_amount

@@ -1,6 +1,9 @@
 from django.urls import reverse
+import logging
 
 from api.models import Notification, Order
+
+logger = logging.getLogger(__name__)
 
 
 class NotificationService:
@@ -9,14 +12,17 @@ class NotificationService:
             return
         if not isinstance(order, Order):
             return
-        link = reverse("order-detail", args=[order.id]) if hasattr(order, "id") else ""
-        Notification.objects.create(
-            user=user,
-            title=title,
-            message=message,
-            type="ORDER",
-            link=link,
-        )
+        try:
+            link = reverse("order-detail", args=[order.id]) if hasattr(order, "id") else ""
+            Notification.objects.create(
+                user=user,
+                title=title,
+                message=message,
+                type="ORDER",
+                link=link,
+            )
+        except Exception as e:
+            logger.error(f"Failed to create notification for user {user.id}: {e}", exc_info=True)
 
     def order_cancelled(self, order):
         title = "Заказ отменен"
@@ -49,4 +55,32 @@ class NotificationService:
         title = "Заказ завершен"
         message = f"Заказ {order.id} успешно завершен."
         self._create_order_notification(getattr(order, "user", None), order, title, message)
+
+    def gift_received(self, gift_order):
+        """
+        Отправить уведомление о получении подарка.
+        """
+        from api.models import GiftOrder, Notification
+
+        if not isinstance(gift_order, GiftOrder):
+            return
+
+        recipient = gift_order.recipient_user
+        if not recipient:
+            return
+
+        try:
+            title = "Вы получили подарок!"
+            message = f"Вам подарили {gift_order.gift_product.name if gift_order.gift_product else 'подарок'}."
+
+            Notification.objects.create(
+                user=recipient,
+                title=title,
+                message=message,
+                type="GIFT",
+                link=f"/my-gifts/",
+            )
+            logger.info(f"Gift notification sent to user {recipient.id}")
+        except Exception as e:
+            logger.error(f"Failed to create gift notification: {e}", exc_info=True)
 

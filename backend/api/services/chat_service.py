@@ -42,66 +42,57 @@ class ChatService:
 
         Возвращает список уникальных собеседников с информацией о последних сообщениях.
         """
-        # Получить всех уникальных собеседников
-        partners = (
-            ChatMessage.objects
-            .filter(Q(sender=user) | Q(recipient=user))
-            .values('sender', 'recipient')
-            .annotate(
-                last_message_time=Count('id'),
-                message_count=Count('id')
-            )
-            .order_by('-last_message_time')
-        )
-
-        partners_data = []
-        for partner in partners:
-            partner_id = partner['sender'] if partner['recipient'] == user.id else partner['recipient']
-            partner_email = None
-            partner_name = None
-
-            # Получить информацию о партнере
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            try:
-                partner_user = User.objects.get(id=partner_id)
-                partner_email = partner_user.email
-                partner_name = f"{partner_user.first_name} {partner_user.last_name}".strip()
-            except User.DoesNotExist:
-                pass
-
-            # Получить последнее сообщение
-            last_message = (
-                ChatMessage.objects
-                .filter(
-                    Q(sender=user, recipient_id=partner_id) |
-                    Q(sender_id=partner_id, recipient=user)
-                )
-                .order_by('-created_at')
-                .first()
-            )
-
-            # Подсчитать непрочитанные сообщения
+        from django.contrib.auth import get_user_model
+        from django.db.models import Q, Max, Count
+        
+        User = get_user_model()
+        
+        # Получить всех уникальных собеседников за один запрос
+        partner_ids = set()
+        messages = ChatMessage.objects.filter(
+            Q(sender=user) | Q(recipient=user)
+        ).values_list('sender', 'recipient')
+        
+        for sender_id, recipient_id in messages:
+            if sender_id != user.id:
+                partner_ids.add(sender_id)
+            if recipient_id != user.id:
+                partner_ids.add(recipient_id)
+        
+        # Загрузить всех партнеров за один запрос
+        partners_dict = {
+            str(u.id): u for u in User.objects.filter(id__in=partner_ids)
+        }
+        
+        # Получить статистику для каждого партнера
+        result = []
+        for partner_id in partner_ids:
+            partner_user = partners_dict.get(str(partner_id))
+            if not partner_user:
+                continue
+            
+            # Получить последнее сообщение и количество непрочитанных
+            last_message = ChatMessage.objects.filter(
+                (Q(sender=user, recipient=partner_user) | Q(sender=partner_user, recipient=user))
+            ).order_by('-created_at').first()
+            
             unread_count = ChatMessage.objects.filter(
-                sender_id=partner_id,
+                sender=partner_user,
                 recipient=user,
                 is_read=False
             ).count()
-
-            partners_data.append({
-                'user_id': str(partner_id),
-                'email': partner_email,
-                'name': partner_name,
-                'last_message': {
-                    'content': last_message.content if last_message else None,
-                    'created_at': last_message.created_at if last_message else None,
-                    'message_type': last_message.message_type if last_message else None,
-                },
-                'unread_count': unread_count,
-                'message_count': partner['message_count'],
+            
+            result.append({
+                'partner_id': str(partner_id),
+                'partner_name': partner_user.username or partner_user.email,
+                'last_message_time': last_message.created_at if last_message else None,
+                'last_message_text': last_message.text if last_message else '',
+                'unread_count': unread_count
             })
-
-        return partners_data
+        
+        # Сортировать по времени последнего сообщения
+        result.sort(key=lambda x: x['last_message_time'] or '', reverse=True)
+        return result
 
     @staticmethod
     def mark_messages_as_read(user, sender_id: str) -> int:
@@ -250,6 +241,7 @@ class ChatService:
         ).exists()
 
         if existing:
+            logger.warning(f"Duplicate rating attempt for order {order.id} by user {rater.email}")
             raise ValueError("Rating already exists for this order and users")
 
         rating_obj = CommunicationRating.objects.create(

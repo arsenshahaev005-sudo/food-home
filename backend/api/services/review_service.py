@@ -349,6 +349,13 @@ class ReviewService:
         if review.refund_offered_amount is None or review.refund_offered_amount <= 0:
             raise ValueError("No correction offer available")
 
+        # Валидация рейтингов
+        for key in ["rating_taste", "rating_appearance", "rating_service"]:
+            if key in new_ratings:
+                value = new_ratings[key]
+                if not isinstance(value, (int, float)) or value < 1 or value > 5:
+                    raise ValueError(f"{key} must be between 1 and 5")
+
         # Обновляем рейтинги
         review.rating_taste = new_ratings.get("rating_taste", review.rating_taste)
         review.rating_appearance = new_ratings.get("rating_appearance", review.rating_appearance)
@@ -403,7 +410,18 @@ class ReviewService:
         """
         Отправить уведомление покупателю о предложении исправления.
         """
-        # TODO: Реализовать отправку уведомления через NotificationService
+        from .notifications import NotificationService
+        notification_service = NotificationService()
+        # Создать уведомление для покупателя о предложении исправить отзыв
+        if review.order and review.order.user:
+            from api.models import Notification
+            Notification.objects.create(
+                user=review.order.user,
+                title="Предложение исправить отзыв",
+                message=f"Продавец предложил исправить ваш отзыв с возвратом {review.refund_offered_amount} руб.",
+                type="REVIEW",
+                link=f"/orders/{review.order.id}/",
+            )
         logger.info(f"Notification sent to buyer about correction offer for review {review.id}")
 
     @staticmethod
@@ -431,6 +449,10 @@ class ReviewService:
             if remaining > 0:
                 amount_to_refund = min(remaining, review.refund_offered_amount)
                 if amount_to_refund > 0:
-                    payment_service = PaymentService()
-                    payment_service.refund_payment(payment, amount=amount_to_refund)
-                    logger.info(f"Refunded {amount_to_refund} to buyer for review correction")
+                    try:
+                        payment_service = PaymentService()
+                        payment_service.refund_payment(payment, amount=amount_to_refund)
+                        logger.info(f"Refunded {amount_to_refund} to buyer for review correction")
+                    except Exception as e:
+                        logger.error(f"Failed to refund for review correction {review.id}: {e}")
+                        raise  # Перебросить для отката транзакции

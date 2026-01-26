@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
+import logging
 
 from django.db import transaction
 from django.utils import timezone
@@ -39,11 +40,23 @@ class OrderStatusService:
         )
 
     def _lock_order(self, order_id):
-        return (
-            Order.objects.select_for_update()
-            .select_related("dish__producer", "user")
-            .get(id=order_id)
-        )
+        try:
+            return (
+                Order.objects.select_for_update()
+                .select_related("dish__producer", "user")
+                .get(id=order_id)
+            )
+        except Order.DoesNotExist:
+            raise InvalidOrderTransition(f"Order {order_id} not found")
+
+    def _check_seller_permission(self, actor: OrderActor, producer_user):
+        """
+        Проверяет права доступа продавца к заказу.
+        """
+        if actor.role not in ["SELLER", "ADMIN"]:
+            raise PermissionDeniedForTransition()
+        if actor.role == "SELLER" and producer_user and producer_user.id != actor.user.id:
+            raise PermissionDeniedForTransition()
 
     @transaction.atomic
     def simulate_payment(self, order_id):
@@ -68,10 +81,7 @@ class OrderStatusService:
         order = self._lock_order(order_id)
         producer = getattr(order.dish, "producer", None)
         producer_user = getattr(producer, "user", None)
-        if actor.role not in ["SELLER", "ADMIN"]:
-            raise PermissionDeniedForTransition()
-        if actor.role == "SELLER" and producer_user and producer_user.id != actor.user.id:
-            raise PermissionDeniedForTransition()
+        self._check_seller_permission(actor, producer_user)
         if order.status != "WAITING_FOR_ACCEPTANCE":
             raise InvalidOrderTransition()
         now = timezone.now()
@@ -92,10 +102,7 @@ class OrderStatusService:
         order = self._lock_order(order_id)
         producer = getattr(order.dish, "producer", None)
         producer_user = getattr(producer, "user", None)
-        if actor.role not in ["SELLER", "ADMIN"]:
-            raise PermissionDeniedForTransition()
-        if actor.role == "SELLER" and producer_user and producer_user.id != actor.user.id:
-            raise PermissionDeniedForTransition()
+        self._check_seller_permission(actor, producer_user)
         if order.status not in ["WAITING_FOR_ACCEPTANCE", "COOKING"]:
             raise InvalidOrderTransition()
         if producer:
@@ -118,10 +125,7 @@ class OrderStatusService:
         order = self._lock_order(order_id)
         producer = getattr(order.dish, "producer", None)
         producer_user = getattr(producer, "user", None)
-        if actor.role not in ["SELLER", "ADMIN"]:
-            raise PermissionDeniedForTransition()
-        if actor.role == "SELLER" and producer_user and producer_user.id != actor.user.id:
-            raise PermissionDeniedForTransition()
+        self._check_seller_permission(actor, producer_user)
         if order.status != "COOKING":
             raise InvalidOrderTransition()
         now = timezone.now()
@@ -139,10 +143,7 @@ class OrderStatusService:
         order = self._lock_order(order_id)
         producer = getattr(order.dish, "producer", None)
         producer_user = getattr(producer, "user", None)
-        if actor.role not in ["SELLER", "ADMIN"]:
-            raise PermissionDeniedForTransition()
-        if actor.role == "SELLER" and producer_user and producer_user.id != actor.user.id:
-            raise PermissionDeniedForTransition()
+        self._check_seller_permission(actor, producer_user)
         if order.status != "READY_FOR_REVIEW":
             raise InvalidOrderTransition()
         order.status = "READY_FOR_DELIVERY"
@@ -154,10 +155,7 @@ class OrderStatusService:
         order = self._lock_order(order_id)
         producer = getattr(order.dish, "producer", None)
         producer_user = getattr(producer, "user", None)
-        if actor.role not in ["SELLER", "ADMIN"]:
-            raise PermissionDeniedForTransition()
-        if actor.role == "SELLER" and producer_user and producer_user.id != actor.user.id:
-            raise PermissionDeniedForTransition()
+        self._check_seller_permission(actor, producer_user)
         if order.status not in ["READY_FOR_REVIEW", "READY_FOR_DELIVERY"]:
             raise InvalidOrderTransition()
         order.status = "DELIVERING"
@@ -286,6 +284,7 @@ class OrderStatusService:
         order.cancelled_at = now
         order.status = "CANCELLED"
         order.save(update_fields=["status", "cancelled_by", "cancelled_reason", "cancelled_at"])
+        logger.info(f"Order {order.id} cancelled by {actor_role}. Reason: {reason}")
         self.finance.on_cancelled(order)
         self.notifications.order_cancelled(order)
         return order

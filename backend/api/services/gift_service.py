@@ -1,11 +1,16 @@
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional, Dict, Any
+import re
+import logging
 
 from django.db import transaction
 from django.db.models import Count, Avg, F, ExpressionWrapper, DurationField
 from django.utils import timezone
 from django.utils import timezone as dj_timezone
+from django.core.exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 
 from api.models import (
     Order,
@@ -150,6 +155,15 @@ class PublicGiftService:
         recipient_contact_phone: str,
         recipient_name: str,
     ) -> GiftOrder:
+        # Валидация email
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, recipient_contact_email):
+            raise ValidationError("Invalid email format")
+        
+        # Валидация телефона (базовая)
+        if not recipient_contact_phone or len(recipient_contact_phone) < 10:
+            raise ValidationError("Invalid phone number")
+        
         valid_until = self._calculate_valid_until(product)
         gift = GiftOrder.objects.create(
             payer=payer,
@@ -250,14 +264,24 @@ class PublicGiftService:
         activation_ip: str,
         activation_user_agent: str,
     ):
+        idempotency, created = GiftActivationIdempotency.objects.select_for_update().get_or_create(
+            activation_token=activation_token,
+        )
+        if not created:
+            # Повторная активация
+            gift = idempotency.gift
+            existing_order = gift.order or idempotency.order
+            if not existing_order:
+                raise ValueError("gift_not_available")
+            return gift, existing_order
+
         gift = (
-            GiftOrder.objects.select_related("gift_product", "payment", "order")
+            GiftOrder.objects.select_for_update()
+            .select_related("gift_product", "payment", "order")
             .get(activation_token=activation_token)
         )
-        idempotency, _ = GiftActivationIdempotency.objects.get_or_create(
-            activation_token=activation_token,
-            defaults={"gift": gift},
-        )
+        idempotency.gift = gift
+        idempotency.save(update_fields=["gift"])
         now = dj_timezone.now()
         if gift.state == GiftOrder.State.ACTIVATED:
             existing_order = gift.order or idempotency.order
@@ -558,39 +582,43 @@ def process_sla_gifts(limit: int = 100) -> int:
     refund_service = GiftRefundService()
     processed = 0
     for gift in gifts:
-        payment = getattr(gift, "payment", None)
-        if not payment:
+        try:
+            payment = getattr(gift, "payment", None)
+            if not payment:
+                continue
+            remaining = payment.amount_captured - payment.amount_refunded
+            if remaining <= 0:
+                continue
+            business_key = f"SLA:{gift.id}"
+            before_refunded = payment.amount_refunded
+            payment, op = refund_service.apply_refund(
+                payment=payment,
+                business_key=business_key,
+                source=RefundOperation.Source.SLA,
+                requested_amount=remaining,
+                approved_amount=remaining,
+            )
+            payment.refresh_from_db()
+            if payment.amount_refunded > before_refunded:
+                processed += 1
+                payer = gift.payer
+                if payer:
+                    OutboxEvent.objects.create(
+                        aggregate_type="gift",
+                        aggregate_id=gift.id,
+                        event_type="GiftRefundNotification",
+                        payload={
+                            "gift_id": str(gift.id),
+                            "payment_id": str(payment.id),
+                            "payer_id": str(payer.id),
+                            "channel": "email_sms",
+                            "reason": "SLA_EXPIRED",
+                            "lifecycle_correlation_id": str(gift.id),
+                        },
+                    )
+        except Exception as e:
+            logger.error(f"Failed to process SLA refund for gift {gift.id}: {e}")
             continue
-        remaining = payment.amount_captured - payment.amount_refunded
-        if remaining <= 0:
-            continue
-        business_key = f"SLA:{gift.id}"
-        before_refunded = payment.amount_refunded
-        payment, op = refund_service.apply_refund(
-            payment=payment,
-            business_key=business_key,
-            source=RefundOperation.Source.SLA,
-            requested_amount=remaining,
-            approved_amount=remaining,
-        )
-        payment.refresh_from_db()
-        if payment.amount_refunded > before_refunded:
-            processed += 1
-            payer = gift.payer
-            if payer:
-                OutboxEvent.objects.create(
-                    aggregate_type="gift",
-                    aggregate_id=gift.id,
-                    event_type="GiftRefundNotification",
-                    payload={
-                        "gift_id": str(gift.id),
-                        "payment_id": str(payment.id),
-                        "payer_id": str(payer.id),
-                        "channel": "email_sms",
-                        "reason": "SLA_EXPIRED",
-                        "lifecycle_correlation_id": str(gift.id),
-                    },
-                )
     return processed
 
 

@@ -38,7 +38,9 @@ class CartService:
         """
         Получить сводную информацию о корзине.
         """
-        items = cart.items.select_related('dish').prefetch_related('dish__producer')
+        if not cart:
+            raise ValueError("Cart is required")
+        items = cart.items.select_related('dish', 'dish__producer')
 
         total_items = items.count()
         total_price = items.aggregate(
@@ -118,7 +120,7 @@ class CartService:
 
         # Увеличить счетчик
         if created:
-            dish.in_cart_count += 1
+            dish.in_cart_count = F('in_cart_count') + 1
             dish.save(update_fields=["in_cart_count"])
 
         logger.info(f"Added {quantity}x {dish.name} to cart for user {user.email}")
@@ -139,6 +141,7 @@ class CartService:
         try:
             dish = Dish.objects.get(id=dish_id)
         except Dish.DoesNotExist:
+            logger.warning(f"Dish with id {dish_id} not found when removing from cart")
             return False
 
         cart, _ = Cart.objects.get_or_create(user=user)

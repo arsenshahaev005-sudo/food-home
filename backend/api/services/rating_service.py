@@ -43,6 +43,8 @@ class RatingService:
             + self.config.weight_appearance
             + self.config.weight_service
         )
+        if total_weight == 0:
+            total_weight = 1  # Избегаем деления на ноль
         score = (
             self.config.weight_taste * review.rating_taste
             + self.config.weight_appearance * review.rating_appearance
@@ -178,7 +180,7 @@ class RatingService:
 
     @transaction.atomic
     def recalc_for_producer(self, producer: Producer) -> Producer:
-        reviews_qs = Review.objects.filter(producer=producer)
+        reviews_qs = Review.objects.filter(producer=producer).select_related('user', 'order')
         raw_rating, count = self._aggregate_reviews(reviews_qs)
         if count == 0:
             producer.rating = 0
