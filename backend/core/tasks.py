@@ -5,13 +5,12 @@
 import asyncio
 import threading
 import time
-from typing import Callable, Any, Dict, Optional, List
-from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-import logging
-from .logging import get_logger
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional
 
+from .logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -348,8 +347,9 @@ job_scheduler = JobScheduler()
 # Примеры часто используемых задач
 def cleanup_expired_orders():
     """Фоновая задача для очистки просроченных заказов."""
-    from api.models import Order
     from django.utils import timezone
+
+    from api.models import Order
     
     expired_threshold = timezone.now() - timedelta(hours=24)
     expired_orders = Order.objects.filter(
@@ -370,6 +370,8 @@ def cleanup_expired_orders():
 
 def update_producer_ratings():
     """Фоновая задача для обновления рейтингов производителей."""
+    from django.db.models import Avg
+
     from api.models import Producer, Review
     
     producers = Producer.objects.all()
@@ -402,13 +404,16 @@ def update_producer_ratings():
 
 def send_daily_reports():
     """Фоновая задача для отправки ежедневных отчетов."""
-    from api.models import Order
     from django.utils import timezone
+
+    from api.models import Order
     
     today = timezone.now().date()
     daily_orders = Order.objects.filter(
         created_at__date=today
     ).count()
+    
+    from django.db.models import Sum
     
     daily_revenue = Order.objects.filter(
         created_at__date=today,

@@ -2,16 +2,14 @@
 Глобальный обработчик исключений для REST API.
 """
 
-import logging
-from rest_framework.views import exception_handler
-from rest_framework.response import Response
-from rest_framework import status
-from django.db import DatabaseError
 from django.core.exceptions import ValidationError
+from django.db import DatabaseError
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import exception_handler
 
 from .exceptions import BaseAppException
 from .logging import get_logger, trace_id_var, user_id_var
-
 
 logger = get_logger(__name__)
 

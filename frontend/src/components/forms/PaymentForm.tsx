@@ -14,7 +14,7 @@ interface PaymentFormProps {
   initialData?: {
     paymentMethod?: 'card' | 'sbp';
   };
-  onDataChange?: (data: PaymentFormData) => void;
+  onDataChange?: (_data: PaymentFormData) => void; // eslint-disable-line no-unused-vars
   autoSave?: boolean;
   autoSaveDelay?: number;
 }

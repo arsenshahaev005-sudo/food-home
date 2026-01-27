@@ -2,12 +2,12 @@
 Сервис для бизнес-логики корзины.
 """
 
-from django.db import transaction
-from django.db.models import Max, Sum, F
-from django.utils import timezone
+import logging
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
-import logging
+
+from django.db import transaction
+from django.db.models import F, Max, Sum
 
 from ..models import Cart, CartItem, Dish
 from ..models_new import SavedCartItem

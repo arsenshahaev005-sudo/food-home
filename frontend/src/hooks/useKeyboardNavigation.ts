@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 
 export interface KeyboardNavigationOptions {
   /**
@@ -44,11 +44,11 @@ export interface KeyboardNavigationOptions {
   /**
    * Callback when Tab key is pressed
    */
-  onTab?: (event: KeyboardEvent) => void;
+  onTab?: (event: KeyboardEvent) => void; // eslint-disable-line no-unused-vars
   /**
    * Callback when any key is pressed
    */
-  onKeyDown?: (event: KeyboardEvent) => void;
+  onKeyDown?: (event: KeyboardEvent) => void; // eslint-disable-line no-unused-vars
   /**
    * Whether to prevent default behavior for handled keys
    */
@@ -63,7 +63,7 @@ export interface UseKeyboardNavigationReturn {
   /**
    * Function to manually handle keyboard event
    */
-  handleKeyDown: (event: KeyboardEvent) => void;
+  handleKeyDown: (event: KeyboardEvent) => void; // eslint-disable-line no-unused-vars
   /**
    * Function to set focus to the element
    */
@@ -237,7 +237,7 @@ export interface UseArrowNavigationOptions {
   /**
    * Callback when selection changes
    */
-  onSelect?: (index: number) => void;
+  onSelect?: (index: number) => void; // eslint-disable-line no-unused-vars
   /**
    * Whether to loop navigation
    */

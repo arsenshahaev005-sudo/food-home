@@ -1,16 +1,16 @@
 from dataclasses import dataclass
 from datetime import timedelta
-import logging
 
 from django.db import transaction
 from django.utils import timezone
 
-from api.models import Order, Dispute, Payment
+from api.models import Order
+
+from .dispute_service import DisputeService
 from .notifications import NotificationService
-from .penalties import PenaltyService
 from .order_finance_service import OrderFinanceService
 from .payment_service import PaymentService
-from .dispute_service import DisputeService
+from .penalties import PenaltyService
 
 
 class InvalidOrderTransition(Exception):

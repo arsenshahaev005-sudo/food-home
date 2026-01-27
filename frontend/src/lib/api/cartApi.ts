@@ -56,7 +56,7 @@ async function apiPost<T>(path: string, body: any, token: string): Promise<T> {
 }
 
 // Helper function for authenticated PATCH requests
-async function apiPatch<T>(path: string, body: any, token: string): Promise<T> {
+async function apiPatch<T>(path: string, body: any, token: string): Promise<T> { // eslint-disable-line no-unused-vars
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'PATCH',
     headers: {

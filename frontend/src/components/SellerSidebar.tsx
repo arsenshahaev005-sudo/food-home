@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function SellerSidebar() {

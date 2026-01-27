@@ -30,7 +30,7 @@ export interface LimitedOffer {
 
 interface LimitedOfferCardProps {
   offer: LimitedOffer;
-  onActivate?: (offerId: string) => Promise<void>;
+  onActivate?: (_offerId: string) => Promise<void>; // eslint-disable-line no-unused-vars
   isActivating?: boolean;
 }
 

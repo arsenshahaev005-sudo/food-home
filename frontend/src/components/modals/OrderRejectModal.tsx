@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { OrderRejectModalProps } from '../../lib/types';
 
 export default function OrderRejectModal({

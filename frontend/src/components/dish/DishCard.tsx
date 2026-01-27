@@ -8,7 +8,6 @@ import { Star, Clock, TrendingUp } from 'lucide-react';
 interface DishCardProps {
   id: string;
   name: string;
-  description: string;
   price: number;
   originalPrice?: number;
   image: string;
@@ -45,7 +44,6 @@ const StarRating: React.FC<{ rating: number; reviewCount: number }> = ({ rating,
 const DishCard: React.FC<DishCardProps> = ({
   id,
   name,
-  description,
   price,
   originalPrice,
   image,

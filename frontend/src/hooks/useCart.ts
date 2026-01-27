@@ -31,13 +31,13 @@ export interface UseCartReturn {
 
   // Cart actions
   refreshCart: () => Promise<void>;
-  handleAddToCart: (dishId: string, quantity?: number, selectedToppings?: any[]) => Promise<void>;
-  handleUpdateQuantity: (dishId: string, quantity: number, selectedToppings?: any[]) => Promise<void>;
-  handleRemoveFromCart: (dishId: string, selectedToppings?: any[]) => Promise<void>;
+  handleAddToCart: (dishId: string, quantity?: number, selectedToppings?: any[]) => Promise<void>; // eslint-disable-line no-unused-vars
+  handleUpdateQuantity: (dishId: string, quantity: number, selectedToppings?: any[]) => Promise<void>; // eslint-disable-line no-unused-vars
+  handleRemoveFromCart: (dishId: string, selectedToppings?: any[]) => Promise<void>; // eslint-disable-line no-unused-vars
   handleClearCart: () => Promise<void>;
-  handleSaveForLater: (dishId: string, quantity: number, selectedToppings?: any[]) => Promise<void>;
-  handleMoveSavedToCart: (itemId: string) => Promise<void>;
-  handleRemoveSavedItem: (itemId: string) => Promise<void>;
+  handleSaveForLater: (dishId: string, quantity: number, selectedToppings?: any[]) => Promise<void>; // eslint-disable-line no-unused-vars
+  handleMoveSavedToCart: (itemId: string) => Promise<void>; // eslint-disable-line no-unused-vars
+  handleRemoveSavedItem: (itemId: string) => Promise<void>; // eslint-disable-line no-unused-vars
 }
 
 export const useCart = (token: string): UseCartReturn => {

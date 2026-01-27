@@ -2,14 +2,14 @@
 Сервис для управления подписками на регулярные заказы.
 """
 
-from django.db.models import Q, Count, Sum
-from django.utils import timezone
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import List, Dict, Optional
-import logging
+from typing import Dict, List, Optional
 
-from ..models import Order, Dish
+from django.utils import timezone
+
+from ..models import Dish, Order
 from ..models_new import SubscriptionOrder
 
 logger = logging.getLogger(__name__)

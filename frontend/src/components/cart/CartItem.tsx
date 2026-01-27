@@ -12,9 +12,9 @@ import { CartItem as CartItemType } from '@/lib/api/cartApi';
 
 interface CartItemProps {
   item: CartItemType;
-  onUpdateQuantity: (dishId: string, quantity: number, selectedToppings?: any[]) => Promise<void>;
-  onRemove: (dishId: string, selectedToppings?: any[]) => Promise<void>;
-  onSaveForLater: (dishId: string, quantity: number, selectedToppings?: any[]) => Promise<void>;
+  onUpdateQuantity: (dishId: string, quantity: number, selectedToppings?: any[]) => Promise<void>; // eslint-disable-line no-unused-vars
+  onRemove: (dishId: string, selectedToppings?: any[]) => Promise<void>; // eslint-disable-line no-unused-vars
+  onSaveForLater: (dishId: string, quantity: number, selectedToppings?: any[]) => Promise<void>; // eslint-disable-line no-unused-vars
   isUpdating?: boolean;
 }
 

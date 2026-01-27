@@ -5,15 +5,16 @@
 """
 
 import logging
+from decimal import Decimal
+from typing import Dict, List, Optional
+
 from django.db import transaction
 from django.utils import timezone
-from decimal import Decimal
-from typing import Dict, Optional, List
 
-from ..models import Order, OrderDraft, Dish, Producer, Profile
-from .penalty_service import PenaltyService
+from ..models import Dish, Order, OrderDraft, Producer, Profile
 from .notifications import NotificationService
 from .payment_service import PaymentService
+from .penalty_service import PenaltyService
 
 logger = logging.getLogger(__name__)
 

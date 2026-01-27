@@ -2,12 +2,13 @@
 Сервис для бизнес-логики отзывов.
 """
 
-from django.db.models import Q, Count, Avg, F
-from django.utils import timezone
-from typing import List, Dict, Optional
 import logging
+from typing import Dict, List
 
-from ..models import Review, Order, Dish, Producer
+from django.db.models import Avg
+from django.utils import timezone
+
+from ..models import Order, Review
 
 logger = logging.getLogger(__name__)
 
@@ -429,8 +430,9 @@ class ReviewService:
         """
         Вернуть деньги покупателю за исправление оценки.
         """
-        from .payment_service import PaymentService
         from api.models import Payment
+
+        from .payment_service import PaymentService
 
         order = review.order
         payment = order.current_payment

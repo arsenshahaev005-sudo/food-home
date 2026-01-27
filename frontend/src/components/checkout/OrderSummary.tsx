@@ -17,8 +17,8 @@ interface OrderSummaryProps {
   deliveryPrice: number;
   discount?: number;
   total: number;
-  onRemoveItem?: (itemId: string) => void;
-  onUpdateQuantity?: (itemId: string, quantity: number) => void;
+  onRemoveItem?: (itemId: string) => void; // eslint-disable-line no-unused-vars
+  onUpdateQuantity?: (itemId: string, quantity: number) => void; // eslint-disable-line no-unused-vars
 }
 
 const OrderSummary: React.FC<OrderSummaryProps> = ({

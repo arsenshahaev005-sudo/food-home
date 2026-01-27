@@ -6,15 +6,15 @@
  * единообразие коммуникации.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { MessageTemplate } from '@/lib/api/chatApi';
 
 interface MessageTemplatesProps {
   templates: MessageTemplate[];
-  onSelectTemplate: (content: string) => void;
-  onCreateTemplate?: (title: string, content: string) => Promise<void>;
-  onUpdateTemplate?: (templateId: string, title: string, content: string) => Promise<void>;
-  onDeleteTemplate?: (templateId: string) => Promise<void>;
+  onSelectTemplate: (content: string) => void; // eslint-disable-line no-unused-vars
+  onCreateTemplate?: (title: string, content: string) => Promise<void>; // eslint-disable-line no-unused-vars
+  onUpdateTemplate?: (templateId: string, title: string, content: string) => Promise<void>; // eslint-disable-line no-unused-vars
+  onDeleteTemplate?: (templateId: string) => Promise<void>; // eslint-disable-line no-unused-vars
   isCreating?: boolean;
 }
 

@@ -1,14 +1,16 @@
-from django.db import models
 import uuid
-from django.conf import settings
+
 import django.utils.timezone
+from django.conf import settings
+from django.db import models
+
 from core.validators import (
-    WeeklyScheduleValidator,
     DeliveryPricingRulesValidator,
     DeliveryZonesValidator,
-    RequisitesValidator,
-    EmployeesValidator,
     DocumentsValidator,
+    EmployeesValidator,
+    RequisitesValidator,
+    WeeklyScheduleValidator,
 )
 
 # Define validator instances as callable classes for migration compatibility
@@ -242,30 +244,6 @@ class Dish(models.Model):
         return self.name
 
 
-class GiftProduct(models.Model):
-    class Type(models.TextChoices):
-        CERTIFICATE = "CERTIFICATE"
-        FIXED_MEAL = "FIXED_MEAL"
-        BUNDLE = "BUNDLE"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    type = models.CharField(max_length=32, choices=Type.choices)
-    base_dish = models.ForeignKey(
-        Dish,
-        on_delete=models.PROTECT,
-        related_name="gift_products",
-        null=True,
-        blank=True,
-    )
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    rules = models.JSONField(default=dict, blank=True)
-    rules_version = models.PositiveIntegerField(default=1)
-    active = models.BooleanField(default=True)
-
-    def __str__(self):
-        return f"GiftProduct {self.id}"
-
-
 class DishImage(models.Model):
     dish = models.ForeignKey(Dish, on_delete=models.CASCADE, related_name="images")
     image = models.URLField()
@@ -280,7 +258,6 @@ class PromoCode(models.Model):
     TYPE_CHOICES = [
         ("DISCOUNT", "Discount Amount"),
         ("FREE_DELIVERY", "Free Delivery"),
-        ("GIFT", "Edible Gift"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -316,7 +293,6 @@ class DishTopping(models.Model):
 class Order(models.Model):
     STATUS_CHOICES = [
         ("WAITING_FOR_PAYMENT", "Waiting for Payment"),
-        ("WAITING_FOR_RECIPIENT", "Waiting for Recipient (Gift)"),
         ("WAITING_FOR_ACCEPTANCE", "Waiting for Acceptance"),
         ("COOKING", "Cooking"),
         ("READY_FOR_REVIEW", "Ready for Review (Photo Uploaded)"),
@@ -460,27 +436,6 @@ class Order(models.Model):
     reschedule_approved_by_buyer = models.BooleanField(
         null=True, blank=True
     )  # None=Pending, True=Yes, False=No
-
-    # Anonymous Gift logic
-    is_gift = models.BooleanField(default=False)
-    is_anonymous = models.BooleanField(default=False)
-    recipient_phone = models.CharField(max_length=50, blank=True)
-    recipient_name = models.CharField(max_length=255, blank=True)
-    recipient_address_text = models.TextField(blank=True)
-    recipient_latitude = models.DecimalField(
-        max_digits=9, decimal_places=6, blank=True, null=True
-    )
-    recipient_longitude = models.DecimalField(
-        max_digits=9, decimal_places=6, blank=True, null=True
-    )
-    recipient_specified_time = models.DateTimeField(null=True, blank=True)
-    gift_proof_image = models.URLField(blank=True, null=True)
-    recipient_token = models.CharField(
-        max_length=64, unique=True, blank=True, null=True, db_index=True
-    )
-    recipient_token_expires_at = models.DateTimeField(null=True, blank=True)
-    recipient_sms_sent = models.BooleanField(default=False)
-    recipient_sms_sent_at = models.DateTimeField(null=True, blank=True)
     tinkoff_payment_id = models.CharField(
         max_length=255, blank=True, null=True, db_index=True
     )
@@ -500,7 +455,6 @@ class Order(models.Model):
             models.Index(fields=["created_at"]),
             models.Index(fields=["status"]),
             models.Index(fields=["tinkoff_payment_id"]),
-            models.Index(fields=["recipient_token"]),
         ]
 
     def __str__(self):
@@ -653,223 +607,6 @@ class Payment(models.Model):
     def __str__(self):
         return f"Dispute for {self.order.id}"
 
-
-class GiftOrder(models.Model):
-    class State(models.TextChoices):
-        CREATED = "CREATED"
-        ACTIVATED = "ACTIVATED"
-        CANCELLED_BY_PAYER = "CANCELLED_BY_PAYER"
-        CANCELLED_BY_SYSTEM_EXPIRED = "CANCELLED_BY_SYSTEM_EXPIRED"
-
-    class PaymentStatus(models.TextChoices):
-        INITIATED = "INITIATED"
-        PENDING = "PENDING"
-        SUCCEEDED = "SUCCEEDED"
-        FAILED = "FAILED"
-        REFUNDED = "REFUNDED"
-        PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED"
-        CANCELLED = "CANCELLED"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
-    payer = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="gift_orders",
-        null=True,
-        blank=True,
-    )
-    recipient_user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        related_name="received_gift_orders",
-        null=True,
-        blank=True,
-    )
-
-    recipient_contact_email = models.CharField(max_length=255, blank=True)
-    recipient_contact_phone = models.CharField(max_length=50, blank=True)
-    recipient_name = models.CharField(max_length=255, blank=True)
-
-    gift_product = models.ForeignKey(
-        GiftProduct,
-        on_delete=models.PROTECT,
-        related_name="gift_orders",
-        null=True,
-        blank=True,
-    )
-
-    state = models.CharField(
-        max_length=64,
-        choices=State.choices,
-        default=State.CREATED,
-    )
-
-    order = models.OneToOneField(
-        "Order",
-        on_delete=models.SET_NULL,
-        related_name="gift_order",
-        null=True,
-        blank=True,
-    )
-
-    gift_code = models.CharField(max_length=64, unique=True)
-    activation_token = models.CharField(max_length=128, unique=True)
-
-    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    currency = models.CharField(max_length=10, default="RUB")
-
-    valid_until = models.DateTimeField(null=True, blank=True)
-    activated_at = models.DateTimeField(null=True, blank=True)
-    cancelled_at = models.DateTimeField(null=True, blank=True)
-
-    payment_external_id = models.CharField(max_length=255, blank=True)
-    payment_status = models.CharField(
-        max_length=30,
-        choices=PaymentStatus.choices,
-        default=PaymentStatus.SUCCEEDED,
-    )
-    payment_metadata = models.JSONField(default=dict, blank=True)
-
-    last_activation_attempt_at = models.DateTimeField(null=True, blank=True)
-    last_activation_ip = models.GenericIPAddressField(null=True, blank=True)
-    last_activation_user_agent = models.TextField(blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"GiftOrder {self.id}"
-
-
-class GiftPayment(models.Model):
-    class Status(models.TextChoices):
-        PENDING = "PENDING"
-        AUTHORIZED = "AUTHORIZED"
-        PAID = "PAID"
-        FAILED = "FAILED"
-        REFUNDED = "REFUNDED"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    gift = models.OneToOneField(
-        GiftOrder, on_delete=models.CASCADE, related_name="payment"
-    )
-    provider = models.CharField(max_length=32)
-    provider_payment_intent_id = models.CharField(max_length=128, null=True, blank=True)
-    provider_charge_id = models.CharField(max_length=128, null=True, blank=True)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    amount_captured = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    amount_refunded = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    currency = models.CharField(max_length=10, default="RUB")
-    status = models.CharField(
-        max_length=32, choices=Status.choices, default=Status.PENDING
-    )
-    metadata = models.JSONField(default=dict, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    version = models.PositiveIntegerField(default=0)
-
-    def __str__(self):
-        return f"GiftPayment {self.id}"
-
-
-class GiftActivationAttempt(models.Model):
-    class Outcome(models.TextChoices):
-        ATTEMPTED = "ATTEMPTED"
-        SUCCESS = "SUCCESS"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    gift = models.ForeignKey(
-        GiftOrder, on_delete=models.CASCADE, related_name="activation_attempts"
-    )
-    attempted_at = models.DateTimeField(auto_now_add=True)
-    ip = models.GenericIPAddressField()
-    user_agent = models.TextField()
-    action = models.CharField(
-        max_length=16,
-        choices=[
-            ("PREVIEW", "PREVIEW"),
-            ("ACTIVATE", "ACTIVATE"),
-        ],
-    )
-    outcome = models.CharField(
-        max_length=16, choices=Outcome.choices, default=Outcome.ATTEMPTED
-    )
-
-    def __str__(self):
-        return f"GiftActivationAttempt {self.id}"
-
-
-class GiftActivationIdempotency(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    activation_token = models.CharField(max_length=128, unique=True)
-    gift = models.ForeignKey(
-        GiftOrder, on_delete=models.CASCADE, related_name="activation_idempotencies"
-    )
-    order = models.OneToOneField(
-        "Order",
-        on_delete=models.CASCADE,
-        related_name="gift_activation_idempotency",
-        null=True,
-        blank=True,
-    )
-    success = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"GiftActivationIdempotency {self.id}"
-
-
-class GiftCreateIdempotency(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    idempotency_key = models.CharField(max_length=128, unique=True)
-    gift = models.OneToOneField(
-        GiftOrder,
-        on_delete=models.CASCADE,
-        related_name="create_idempotency",
-        null=True,
-        blank=True,
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"GiftCreateIdempotency {self.id}"
-
-
-class RefundOperation(models.Model):
-    class Source(models.TextChoices):
-        SLA = "SLA"
-        DISPUTE = "DISPUTE"
-        CHARGEBACK = "CHARGEBACK"
-        MANUAL = "MANUAL"
-
-    class Status(models.TextChoices):
-        REQUESTED = "REQUESTED"
-        PSP_PENDING = "PSP_PENDING"
-        PSP_COMPLETED = "PSP_COMPLETED"
-        PSP_FAILED = "PSP_FAILED"
-        CANCELLED = "CANCELLED"
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    payment = models.ForeignKey(
-        GiftPayment, on_delete=models.CASCADE, related_name="refund_operations"
-    )
-    business_key = models.CharField(max_length=128, unique=True)
-    source = models.CharField(max_length=16, choices=Source.choices)
-    requested_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    approved_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(
-        max_length=32, choices=Status.choices, default=Status.REQUESTED
-    )
-    psp_reference = models.CharField(max_length=128, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    archived_at = models.DateTimeField(null=True, blank=True)
-
-    def __str__(self):
-        return f"RefundOperation {self.id}"
 
 
 class OutboxEvent(models.Model):
@@ -1044,8 +781,9 @@ class VerificationCode(models.Model):
     is_used = models.BooleanField(default=False)
 
     def is_valid(self):
-        from django.utils import timezone
         import datetime
+
+        from django.utils import timezone
 
         return not self.is_used and (
             timezone.now() - self.created_at
@@ -1063,7 +801,6 @@ class Profile(models.Model):
     # New fields for buyer stats
     disputes_lost = models.PositiveIntegerField(default=0)
     unjustified_cancellations = models.PositiveIntegerField(default=0)
-    gift_notification_preferences = models.JSONField(default=dict, blank=True)
 
     # Repeat purchase stats
     total_orders = models.PositiveIntegerField(default=0)
@@ -1093,8 +830,9 @@ class PendingRegistration(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def is_valid(self):
-        from django.utils import timezone
         import datetime
+
+        from django.utils import timezone
 
         return (timezone.now() - self.created_at) < datetime.timedelta(minutes=30)
 
@@ -1116,8 +854,9 @@ class PendingChange(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def is_valid(self):
-        from django.utils import timezone
         import datetime
+
+        from django.utils import timezone
 
         return (timezone.now() - self.created_at) < datetime.timedelta(minutes=10)
 
@@ -1255,9 +994,11 @@ class FavoriteDish(models.Model):
 Этот файл будет объединен с models.py.
 """
 
-from django.db import models
 import uuid
+
 from django.conf import settings
+from django.db import models
+
 from .models import Dish, Order
 
 
@@ -1296,18 +1037,6 @@ class OrderDraft(models.Model):
     selected_toppings = models.JSONField(
         default=list, blank=True, help_text="List of {name, price} selected toppings"
     )
-    is_gift = models.BooleanField(default=False)
-    is_anonymous = models.BooleanField(default=False)
-    recipient_phone = models.CharField(max_length=50, blank=True)
-    recipient_name = models.CharField(max_length=255, blank=True)
-    recipient_address_text = models.TextField(blank=True)
-    recipient_latitude = models.DecimalField(
-        max_digits=9, decimal_places=6, blank=True, null=True
-    )
-    recipient_longitude = models.DecimalField(
-        max_digits=9, decimal_places=6, blank=True, null=True
-    )
-    recipient_specified_time = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

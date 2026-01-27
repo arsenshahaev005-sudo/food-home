@@ -172,7 +172,7 @@ export default function OrderDetailPage() {
     );
   }
 
-  const status = getStatusInfo(order.status, !!order.is_gift);
+  const status = getStatusInfo(order.status, false);
   const isSeller = (order as any).is_seller || false;
   const canReject = isSeller && order.status === 'WAITING_FOR_ACCEPTANCE';
   const canAddTips = !isSeller && order.status === 'COMPLETED';
@@ -251,15 +251,6 @@ export default function OrderDetailPage() {
                   <span className="font-medium">Стоимость доставки:</span> {order.delivery_price} ₽
                 </p>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Additional Info */}
-        {order.is_gift && (
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
-              <p className="text-purple-700 font-medium">🎁 Это подарочный заказ</p>
             </div>
           </div>
         )}

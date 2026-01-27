@@ -1,7 +1,8 @@
 import hashlib
+
 import requests
-import json
 from django.conf import settings
+
 
 class TinkoffClient:
     def __init__(self, terminal_key, password):

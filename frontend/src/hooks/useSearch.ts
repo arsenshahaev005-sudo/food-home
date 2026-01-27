@@ -42,9 +42,9 @@ interface UseSearchReturn {
   savedSearches: SavedSearchItem[];
   loading: boolean;
   error: string | null;
-  handleSearch: (query: string) => void;
-  handleSaveSearch: (name: string, queryParams: Record<string, any>) => Promise<void>;
-  handleDeleteSavedSearch: (id: string) => Promise<void>;
+  handleSearch: () => void;
+  handleSaveSearch: () => Promise<void>;
+  handleDeleteSavedSearch: () => Promise<void>;
   loadHistory: () => Promise<void>;
   loadSavedSearches: () => Promise<void>;
 }

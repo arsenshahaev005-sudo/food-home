@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { ComplaintModalProps } from '../../lib/types';
 
 const COMPLAINT_REASONS = [

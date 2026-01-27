@@ -6,8 +6,6 @@
 import json
 import os
 from typing import Any, Dict, List, Optional
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 # Импорт для MCP-сервера (если установлен)
 try:

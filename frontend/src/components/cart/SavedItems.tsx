@@ -11,8 +11,8 @@ import { SavedCartItem as SavedItemType } from '@/lib/api/cartApi';
 
 interface SavedItemsProps {
   items: SavedItemType[];
-  onMoveToCart: (itemId: string) => Promise<void>;
-  onRemove: (itemId: string) => Promise<void>;
+  onMoveToCart: (itemId: string) => Promise<void>; // eslint-disable-line no-unused-vars
+  onRemove: (itemId: string) => Promise<void>; // eslint-disable-line no-unused-vars
   isMoving?: boolean;
 }
 

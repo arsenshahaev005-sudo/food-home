@@ -15,7 +15,7 @@ export interface FAQCategory {
 }
 
 export default function FaqPage() {
-  const [categories, setCategories] = useState<FAQCategory[]>([
+  const [categories] = useState<FAQCategory[]>([
     {
       id: 'delivery',
       name: 'Доставка',

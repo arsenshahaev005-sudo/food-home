@@ -1,17 +1,18 @@
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional
-import logging
 
 from django.db import transaction
 from django.utils import timezone
 
 from api.models import Order, Payment
-from .order_status import OrderStatusService
-from .order_finance_service import OrderFinanceService
+
 from .notifications import NotificationService
-from .penalties import PenaltyService
+from .order_finance_service import OrderFinanceService
+from .order_status import OrderStatusService
 from .payment_service import PaymentService
+from .penalties import PenaltyService
 from .rating_service import RatingService
 
 logger = logging.getLogger(__name__)

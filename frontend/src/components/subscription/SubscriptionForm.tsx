@@ -12,7 +12,7 @@ interface SubscriptionFormProps {
   dishId: string;
   dishName: string;
   dishPrice: string;
-  onSubmit: (data: SubscriptionFormData) => Promise<void>;
+  onSubmit: (_data: SubscriptionFormData) => Promise<void>; // eslint-disable-line no-unused-vars
   isSubmitting?: boolean;
 }
 

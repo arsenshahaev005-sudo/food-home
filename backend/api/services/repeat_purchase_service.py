@@ -7,9 +7,9 @@ from decimal import Decimal
 from typing import List
 
 from django.db import transaction
-from django.db.models import Count, Q, F
+from django.db.models import Count, F
 
-from api.models import Order, Profile, Producer, Dish
+from api.models import Order, Producer, Profile
 
 logger = logging.getLogger(__name__)
 

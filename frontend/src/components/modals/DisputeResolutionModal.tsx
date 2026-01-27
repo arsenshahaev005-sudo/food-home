@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { DisputeResolutionModalProps, DisputeResolution } from '../../lib/types';
 
 export default function DisputeResolutionModal({

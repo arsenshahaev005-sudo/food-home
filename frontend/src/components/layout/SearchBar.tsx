@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
 
 export interface SearchBarProps {
-  onSearch?: (query: string) => void;
+  onSearch?: (query: string) => void; // eslint-disable-line no-unused-vars
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;

@@ -3,13 +3,13 @@
 Использует JSON формат для удобства парсинга и анализа.
 """
 
-import logging
 import json
+import logging
 import sys
-import time
 from contextvars import ContextVar
-from typing import Any, Dict, Optional
 from datetime import datetime
+from typing import Optional
+
 from django.conf import settings
 
 # Context variables для trace_id и user_id

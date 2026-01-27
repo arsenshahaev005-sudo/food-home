@@ -7,7 +7,6 @@ interface AcceptCorrectionModalPropsExtended extends AcceptCorrectionModalProps 
   proposal?: {
     refund_amount?: number;
     partial_refund?: number;
-    gift_voucher?: string;
     message: string;
   };
 }
@@ -112,14 +111,6 @@ export default function AcceptCorrectionModal({
               </div>
             )}
 
-            {proposal.gift_voucher && (
-              <div className="mb-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                <p className="text-sm font-medium text-purple-700">
-                  🎁 Промокод / Подарочный сертификат: {proposal.gift_voucher}
-                </p>
-              </div>
-            )}
-
             {proposal.message && (
               <div className="mt-3">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
@@ -142,9 +133,6 @@ export default function AcceptCorrectionModal({
               )}
               {proposal?.partial_refund && (
                 <li>✓ Вы получите частичный возврат {proposal.partial_refund} ₽</li>
-              )}
-              {proposal?.gift_voucher && (
-                <li>✓ Вы получите промокод: {proposal.gift_voucher}</li>
               )}
               <li>✓ Продавец сможет улучшить свою оценку</li>
             </ul>

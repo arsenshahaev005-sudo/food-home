@@ -3,6 +3,7 @@ Management команда для обработки опоздавших дос�
 Применять штрафы. Запускать каждые 10 минут.
 """
 import logging
+
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 

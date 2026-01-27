@@ -1,22 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { Star, ThumbsUp, ThumbsDown, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
+import { Star, ThumbsUp, ThumbsDown, Image as ImageIcon } from 'lucide-react';
 import { ReviewWithCorrections } from '../../lib/types';
 
 interface ReviewItemProps {
   review: ReviewWithCorrections;
   isSeller?: boolean;
-  onProposeCorrection?: (reviewId: string, correction: {
+  onProposeCorrection?: (_reviewId: string, _correction: { // eslint-disable-line no-unused-vars
     refund_amount?: number;
     partial_refund?: number;
-    gift_voucher?: string;
     message: string;
   }) => Promise<void>;
-  onAcceptCorrection?: (reviewId: string) => Promise<void>;
-  onRejectCorrection?: (reviewId: string) => Promise<void>;
-  onHelpful?: (reviewId: string) => void;
-  onNotHelpful?: (reviewId: string) => void;
+  onAcceptCorrection?: (_reviewId: string) => Promise<void>; // eslint-disable-line no-unused-vars
+  onRejectCorrection?: (_reviewId: string) => Promise<void>; // eslint-disable-line no-unused-vars
+  onHelpful?: (_reviewId: string) => void; // eslint-disable-line no-unused-vars
+  onNotHelpful?: (_reviewId: string) => void; // eslint-disable-line no-unused-vars
   helpfulCount?: number;
   notHelpfulCount?: number;
 }
@@ -206,14 +205,6 @@ export default function ReviewItem({
             <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded">
               <p className="text-sm font-medium text-green-700">
                 💰 Предложен возврат: {latestCorrection.proposed_refund} ₽
-              </p>
-            </div>
-          )}
-          
-          {latestCorrection.proposed_gift_voucher && (
-            <div className="mb-2 p-2 bg-purple-50 border border-purple-200 rounded">
-              <p className="text-sm font-medium text-purple-700">
-                🎁 Промокод: {latestCorrection.proposed_gift_voucher}
               </p>
             </div>
           )}

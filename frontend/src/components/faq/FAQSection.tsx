@@ -26,7 +26,7 @@ export interface FAQSectionProps {
 
 const FAQSection = ({ categories: initialCategories, token = '', className = '' }: FAQSectionProps) => {
   const [articles, setArticles] = useState<HelpArticle[]>([]);
-  const [apiCategories, setApiCategories] = useState<string[]>([]);
+  const [, setApiCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);

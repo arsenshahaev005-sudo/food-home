@@ -13,7 +13,7 @@ import { Recommendation as RecommendationType } from '@/lib/api/recommendationAp
 
 interface RecommendationCardProps {
   recommendation: RecommendationType;
-  onMarkAsClicked: (recommendationId: string) => void;
+  onMarkAsClicked: (_recommendationId: string) => void; // eslint-disable-line no-unused-vars
 }
 
 export const RecommendationCard: React.FC<RecommendationCardProps> = ({

@@ -2,10 +2,11 @@
 Улучшенная система пагинации для API.
 """
 
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.response import Response
 from collections import OrderedDict
 from urllib.parse import urlencode
+
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -19,7 +20,6 @@ class StandardResultsSetPagination(PageNumberPagination):
     def get_paginated_response(self, data):
         # Получаем текущий URL без параметров пагинации
         request = self.request
-        url_without_pagination = request.build_absolute_uri()
         
         # Убираем параметры пагинации из URL
         query_params = request.GET.copy()
@@ -77,7 +77,6 @@ class SmallResultsSetPagination(PageNumberPagination):
 
     def _get_response(self, data):
         request = self.request
-        url_without_pagination = request.build_absolute_uri()
         
         query_params = request.GET.copy()
         if 'page' in query_params:
@@ -133,7 +132,6 @@ class LargeResultsSetPagination(PageNumberPagination):
 
     def _get_response(self, data):
         request = self.request
-        url_without_pagination = request.build_absolute_uri()
         
         query_params = request.GET.copy()
         if 'page' in query_params:

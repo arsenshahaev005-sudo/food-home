@@ -1,11 +1,10 @@
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
-from django.db import transaction, models
+from django.db import models, transaction
 from django.utils import timezone
 
 from api.models import OutboxEvent, PublishedEvent
-
 
 MAX_ATTEMPTS = 10
 

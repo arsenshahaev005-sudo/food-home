@@ -8,11 +8,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   getRecommendations,
-  getOrderHistoryRecommendations,
-  getSimilarItemsRecommendations,
-  getFrequentlyBoughtTogetherRecommendations,
-  getSeasonalRecommendations,
-  getLocationBasedRecommendations,
   markRecommendationsAsShown,
   markRecommendationAsClicked,
   getPersonalizedOffers,
@@ -31,9 +26,9 @@ export interface UseRecommendationsReturn {
   // Recommendations actions
   refreshRecommendations: () => Promise<void>;
   refreshPersonalizedOffers: () => Promise<void>;
-  handleMarkAsShown: (recommendationIds: string[]) => Promise<void>;
-  handleMarkAsClicked: (recommendationId: string) => Promise<void>;
-  handleActivateOffer: (offerId: string) => Promise<void>;
+  handleMarkAsShown: () => Promise<void>;
+  handleMarkAsClicked: () => Promise<void>;
+  handleActivateOffer: () => Promise<void>;
 }
 
 export const useRecommendations = (token: string): UseRecommendationsReturn => {

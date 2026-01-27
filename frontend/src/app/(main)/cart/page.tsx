@@ -168,7 +168,7 @@ export default async function Page() {
 
           {itemsWithDish.length === 0 && (
             <div className="lg:col-span-3">
-              <div className="bg-gray-800/50 backdrop-blur-sm p-10 rounded-2xl shadow-xl text-center space-y-4">
+              <div className="bg-white backdrop-blur-sm p-10 rounded-2xl shadow-xl text-center space-y-4">
                 <div className="text-2xl font-black text-gray-900">Корзина пуста</div>
                 <div className="text-sm" style={{ color: "#7c6b62" }}>
                   Добавьте блюда в корзину на главной или в каталоге.

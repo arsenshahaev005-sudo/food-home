@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 
 interface ReferralLinkProps {
   referralLink: string;
-  onShare: (platform: string) => void;
+  onShare: (_platform: string) => void; // eslint-disable-line no-unused-vars
 }
 
 export const ReferralLink: React.FC<ReferralLinkProps> = ({

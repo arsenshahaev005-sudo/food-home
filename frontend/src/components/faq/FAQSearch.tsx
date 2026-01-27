@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
 
 export interface FAQSearchProps {
-  onSearch?: (query: string) => void;
+  onSearch?: (query: string) => void; // eslint-disable-line no-unused-vars
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
@@ -42,7 +42,7 @@ const FAQSearch = ({
     }
   };
 
-  const handleKeyDown = (event: { key: string }) => {
+  const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       handleSearch();

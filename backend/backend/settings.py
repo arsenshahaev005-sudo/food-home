@@ -1,6 +1,7 @@
-from pathlib import Path
 import os
 from datetime import timedelta
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,6 +11,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-placeholder')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',')
+
+# Fix Django 4.2+ warning about automatically created primary keys
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -32,7 +36,6 @@ INSTALLED_APPS = [
     'apps.producers',
     'apps.cart',
     'apps.payments',
-    'apps.gifts',
 ]
 
 MIDDLEWARE = [

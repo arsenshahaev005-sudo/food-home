@@ -2,12 +2,11 @@
 Утилиты для улучшенного управления миграциями.
 """
 
+from typing import List
+
 from django.db import migrations, models
 from django.db.migrations.operations.fields import AddField
-from django.db.migrations.operations.models import CreateModel, DeleteModel
-from django.db.migrations.operations.indexes import AddIndex, RemoveIndex
-from django.db.migrations import RunPython, RunSQL
-from typing import List, Dict, Any
+from django.db.migrations.operations.indexes import AddIndex
 
 
 class MigrationHelper:

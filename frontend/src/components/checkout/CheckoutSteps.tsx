@@ -6,7 +6,7 @@ export type CheckoutStep = 'delivery' | 'payment' | 'review';
 
 interface CheckoutStepsProps {
   currentStep: CheckoutStep;
-  onStepChange?: (step: CheckoutStep) => void;
+  onStepChange?: (step: CheckoutStep) => void; // eslint-disable-line no-unused-vars
   completedSteps?: CheckoutStep[];
 }
 

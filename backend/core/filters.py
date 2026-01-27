@@ -4,7 +4,8 @@
 
 import django_filters
 from django_filters import rest_framework as filters
-from .models import Producer, Dish, Order, Category, Review
+
+from .models import Category, Dish, Order, Producer, Review
 
 
 class ProducerFilter(filters.FilterSet):

@@ -2,18 +2,16 @@
 Улучшенная система аутентификации и авторизации для приложения.
 """
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import make_password
-from django.core.exceptions import ValidationError
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from typing import Optional, Dict, Any
 from datetime import datetime
-import jwt
-from django.conf import settings
-from .exceptions import ValidationException, BusinessRuleException
-from .logging import get_logger
+from typing import Any, Dict, Optional
 
+import jwt
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from .exceptions import BusinessRuleException, ValidationException
+from .logging import get_logger
 
 logger = get_logger(__name__)
 User = get_user_model()
@@ -172,7 +170,7 @@ class AuthService:
                 'token_refresh_failed',
                 error=str(e)
             )
-            raise BusinessRuleException("Невозможно обновить токен", rule_name="token_refresh")
+            raise BusinessRuleException("Невозможно обновить токен", rule_name="token_refresh") from e
     
     @staticmethod
     def decode_token(token: str) -> Dict[str, Any]:
@@ -193,7 +191,7 @@ class AuthService:
                 'token_decode_failed',
                 error=str(e)
             )
-            raise ValidationException("Неверный формат токена", field="token")
+            raise ValidationException("Неверный формат токена", field="token") from e
     
     @staticmethod
     def get_user_from_token(token: str) -> Optional[User]:

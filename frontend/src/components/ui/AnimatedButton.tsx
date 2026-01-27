@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface AnimatedButtonProps {
   children: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'ghost';

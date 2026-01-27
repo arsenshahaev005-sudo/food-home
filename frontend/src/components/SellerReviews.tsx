@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getProducerReviews, type Profile, type Review } from '@/lib/api';
 
 // Helper to get cookie value
@@ -21,7 +21,7 @@ const SellerReviews: React.FC<SellerReviewsProps> = ({ profile }) => {
   const [filter, setFilter] = useState<FilterId>('all');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   // Dispute state
   const [disputeReviewId, setDisputeReviewId] = useState<string | null>(null);
@@ -60,17 +60,6 @@ const SellerReviews: React.FC<SellerReviewsProps> = ({ profile }) => {
   }, [profile.producer_id]);
 
   const reviewsCount = reviews.length;
-
-  const avgTaste = reviewsCount
-    ? reviews.reduce((sum, r) => sum + (r.rating_taste || 0), 0) / reviewsCount
-    : 0;
-  const avgAppearance = reviewsCount
-    ? reviews.reduce((sum, r) => sum + (r.rating_appearance || 0), 0) / reviewsCount
-    : 0;
-  const avgService = reviewsCount
-    ? reviews.reduce((sum, r) => sum + (r.rating_service || 0), 0) / reviewsCount
-    : 0;
-  const overallAvg = reviewsCount ? (avgTaste + avgAppearance + avgService) / 3 : 0;
 
   const filteredReviews = useMemo(() => {
     if (filter === 'all') {
@@ -178,7 +167,7 @@ const SellerReviews: React.FC<SellerReviewsProps> = ({ profile }) => {
                           {Math.round(avgRating)}
                         </div>
                         <div>
-                          <div className="font-bold text-gray-900">{review.user || 'Покупатель'}</div>
+                          <div className="font-bold text-gray-900">{review.user ? `${review.user.first_name} ${review.user.last_name}` : 'Покупатель'}</div>
                           <div className="flex items-center gap-2">
                             <div className="text-sm text-gray-400">
                               {new Date(review.created_at).toLocaleDateString('ru-RU', {

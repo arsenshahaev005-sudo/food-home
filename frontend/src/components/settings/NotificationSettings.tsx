@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Bell, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { 
-  getNotificationSettings, 
+import {
+  getNotificationSettings,
   updateNotificationSettings,
-  NotificationSettings 
+  type NotificationSettings as NotificationSettingsType
 } from '@/lib/api/notificationApi';
 
 interface NotificationSettingsProps {
@@ -12,15 +12,11 @@ interface NotificationSettingsProps {
 }
 
 const NotificationSettings = ({ token, onSuccess }: NotificationSettingsProps) => {
-  const [settings, setSettings] = useState<NotificationSettings | null>(null);
+  const [settings, setSettings] = useState<NotificationSettingsType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadSettings();
-  }, [token]);
 
   const loadSettings = async () => {
     setIsLoading(true);
@@ -36,7 +32,11 @@ const NotificationSettings = ({ token, onSuccess }: NotificationSettingsProps) =
     }
   };
 
-  const handleToggle = async (key: keyof NotificationSettings) => {
+  useEffect(() => {
+    loadSettings();
+  }, [token]);
+
+  const handleToggle = async (key: keyof NotificationSettingsType) => {
     if (!settings) return;
 
     const newSettings = { ...settings, [key]: !settings[key] };
@@ -44,7 +44,7 @@ const NotificationSettings = ({ token, onSuccess }: NotificationSettingsProps) =
     await saveSettings(newSettings);
   };
 
-  const saveSettings = async (newSettings: NotificationSettings) => {
+  const saveSettings = async (newSettings: NotificationSettingsType) => {
     setIsSaving(true);
     setError(null);
     setSuccessMessage(null);

@@ -17,9 +17,6 @@ import {
   requestChange,
   confirmChange,
   updateProfile,
-  getGiftNotificationSettings,
-  updateGiftNotificationSettings,
-  type GiftNotificationSubscriptions,
   Profile,
   PaymentMethod,
   UserDevice,
@@ -52,9 +49,6 @@ export default function ProfilePage() {
   const [devices, setDevices] = useState<UserDevice[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [helpArticles, setHelpArticles] = useState<HelpArticle[]>([]);
-  const [giftSubscriptions, setGiftSubscriptions] = useState<GiftNotificationSubscriptions>({});
-  const [giftSettingsLoading, setGiftSettingsLoading] = useState(false);
-  const [giftSettingsSaving, setGiftSettingsSaving] = useState(false);
   
   // UI states
   const [activeSection, setActiveSection] = useState<string | null>(null);
@@ -125,7 +119,6 @@ export default function ProfilePage() {
         }
         setProfile(p);
         loadNotifications(token).catch(console.error);
-        loadGiftSettings(token).catch(console.error);
       })
       .catch(() => {
         router.push("/auth/login");
@@ -165,18 +158,6 @@ export default function ProfilePage() {
       const data = await getNotifications(token);
       setNotifications(data);
     } catch (e) { console.error(e); }
-  };
-
-  const loadGiftSettings = async (token: string) => {
-    try {
-      setGiftSettingsLoading(true);
-      const data = await getGiftNotificationSettings(token);
-      setGiftSubscriptions(data.subscriptions || {});
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setGiftSettingsLoading(false);
-    }
   };
 
   const loadHelp = async () => {
@@ -803,108 +784,6 @@ export default function ProfilePage() {
             <div className="text-sm font-medium px-3 py-1 rounded-full bg-[#fff5f0] text-[#c9825b]">
                 Показать
             </div>
-          </div>
-        </div>
-
-        <div className="pb-6 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="font-medium text-lg" style={{ color: "#4b2f23" }}>
-                Уведомления о подарках
-              </div>
-              <div className="text-sm text-gray-500">
-                Выберите события и каналы для оповещений
-              </div>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {[
-              { key: "GiftActivated", label: "Подарок активирован" },
-              { key: "GiftConsumed", label: "Подарок использован" },
-              { key: "GiftExpired", label: "Срок подарка истёк" },
-            ].map((item) => {
-              const current: ("email" | "push" | "crm")[] = giftSubscriptions[item.key] || [];
-              const toggleChannel = (channel: "email" | "push" | "crm") => {
-                setGiftSubscriptions((prev) => {
-                  const existing = prev[item.key] || [];
-                  const has = existing.includes(channel);
-                  const next = has ? existing.filter((c) => c !== channel) : [...existing, channel];
-                  const cleaned = { ...prev };
-                  if (next.length === 0) {
-                    delete cleaned[item.key];
-                  } else {
-                    cleaned[item.key] = next;
-                  }
-                  return cleaned;
-                });
-              };
-              const channels: { key: "email" | "push" | "crm"; label: string }[] = [
-                { key: "email", label: "Email" },
-                { key: "push", label: "Push" },
-                { key: "crm", label: "CRM" },
-              ];
-              return (
-                <div
-                  key={item.key}
-                  className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-xl bg-gray-50 px-4 py-3"
-                >
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">{item.label}</div>
-                    <div className="text-xs text-gray-500">
-                      {item.key === "GiftActivated" && "Когда вы активируете полученный подарок"}
-                      {item.key === "GiftConsumed" && "Когда подарок превращается в заказ"}
-                      {item.key === "GiftExpired" && "Когда истёк срок действия подарка"}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {channels.map((ch) => {
-                      const checked = current.includes(ch.key);
-                      return (
-                        <label
-                          key={ch.key}
-                          className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium cursor-pointer hover:border-[#c9825b]/60"
-                        >
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-gray-300"
-                            style={{ accentColor: "#c9825b" }}
-                            checked={checked}
-                            onChange={() => toggleChannel(ch.key)}
-                          />
-                          <span className="text-gray-700">{ch.label}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex justify-end mt-4">
-            <button
-              type="button"
-              disabled={giftSettingsSaving || giftSettingsLoading}
-              onClick={async () => {
-                const token = getCookie("accessToken");
-                if (!token) return;
-                try {
-                  setGiftSettingsSaving(true);
-                  const data = await updateGiftNotificationSettings(giftSubscriptions, token);
-                  setGiftSubscriptions(data.subscriptions || {});
-                } catch (e) {
-                  handleError(e, "Не удалось сохранить настройки уведомлений о подарках");
-                } finally {
-                  setGiftSettingsSaving(false);
-                }
-              }}
-              className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold"
-              style={{
-                backgroundColor: giftSettingsSaving ? "#e5e7eb" : "#c9825b",
-                color: giftSettingsSaving ? "#6b7280" : "#ffffff",
-              }}
-            >
-              {giftSettingsSaving ? "Сохранение..." : "Сохранить настройки"}
-            </button>
           </div>
         </div>
 

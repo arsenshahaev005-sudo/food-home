@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { Star, ThumbsUp, ThumbsDown, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
+import { Star, ThumbsUp, ThumbsDown, Image as ImageIcon, Video } from 'lucide-react';
 
 interface ReviewCardProps {
   id: string;
-  dishId?: string;
-  producerId?: string;
   userName: string;
   rating: number;
   text: string;
@@ -20,14 +18,12 @@ interface ReviewCardProps {
   ratingService?: number;
   ratingPortion?: number;
   ratingPackaging?: number;
-  onHelpful?: (reviewId: string) => void;
-  onNotHelpful?: (reviewId: string) => void;
+  onHelpful?: () => void;
+  onNotHelpful?: () => void;
 }
 
 const ReviewCard: React.FC<ReviewCardProps> = ({
   id,
-  dishId,
-  producerId,
   userName,
   rating,
   text,
@@ -170,12 +166,11 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
                 src={video}
                 controls
                 className="w-full h-48 object-cover rounded-lg"
-                loading="lazy"
               >
                 Ваш браузер не поддерживает видео
               </video>
               <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-                <VideoIcon className="w-3 h-3" />
+                <Video className="w-3 h-3" />
                 Видео
               </div>
             </div>

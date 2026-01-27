@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { requestPasswordReset, resetPassword } from "@/lib/api";
@@ -22,7 +22,7 @@ export default function ForgotPasswordPage() {
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setInterval>;
     if (resendCooldown > 0) {
       timer = setInterval(() => {
         setResendCooldown((prev) => prev - 1);
@@ -40,8 +40,9 @@ export default function ForgotPasswordPage() {
       await requestPasswordReset(identifier);
       setStep("reset");
       setSuccess(loginMethod === "phone" ? "Код отправлен на ваш номер телефона" : "Код для сброса пароля отправлен на вашу почту");
-    } catch (err: any) {
-      setError(err?.detail || "Ошибка при запросе сброса пароля");
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setError((err as any)?.detail || "Ошибка при запросе сброса пароля");
     } finally {
       setLoading(false);
     }
@@ -58,8 +59,9 @@ export default function ForgotPasswordPage() {
       setTimeout(() => {
         router.push("/auth/login");
       }, 2000);
-    } catch (err: any) {
-      setError(err?.detail || "Ошибка при сбросе пароля");
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setError((err as any)?.detail || "Ошибка при сбросе пароля");
     } finally {
       setLoading(false);
     }
@@ -74,8 +76,9 @@ export default function ForgotPasswordPage() {
       await requestPasswordReset(identifier);
       setSuccess(loginMethod === "phone" ? "Код отправлен на ваш номер телефона" : "Код для сброса пароля отправлен на вашу почту");
       setResendCooldown(60);
-    } catch (err: any) {
-      setError(err?.detail || "Не удалось отправить код повторно");
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setError((err as any)?.detail || "Не удалось отправить код повторно");
     } finally {
       setLoading(false);
     }

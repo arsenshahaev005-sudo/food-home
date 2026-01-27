@@ -2,15 +2,14 @@
 Сервис для генерации рекомендаций на основе поведения пользователя.
 """
 
-from django.db.models import Count, Sum, Avg, F, Q, Prefetch
-from django.utils import timezone
-from datetime import datetime, timedelta
-from decimal import Decimal
-from typing import List, Dict, Optional
 import logging
+from typing import Dict, List
 
-from ..models import Dish, Order, Category, Producer, FavoriteDish
-from ..models_new import Recommendation, UserPreference
+from django.db.models import Avg, Count, Q
+from django.utils import timezone
+
+from ..models import Dish, Order, Producer
+from ..models_new import Recommendation
 
 logger = logging.getLogger(__name__)
 

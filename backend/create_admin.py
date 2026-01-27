@@ -3,13 +3,15 @@
 Скрипт для создания администратора и тестовых пользователей.
 """
 import os
+
 import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
-from django.contrib.auth import get_user_model
-from api.models import Profile
+from django.contrib.auth import get_user_model  # noqa: E402
+
+from api.models import Profile  # noqa: E402
 
 User = get_user_model()
 
@@ -62,7 +64,7 @@ def create_users():
         print(f'+ Test seller already exists: {seller_email}')
     
     # Выводим статистику
-    print(f'\nUser statistics:')
+    print('\nUser statistics:')
     print(f'  Total users: {User.objects.count()}')
     print(f'  Active users: {User.objects.filter(is_active=True).count()}')
     print(f'  Admins: {User.objects.filter(is_superuser=True).count()}')

@@ -17,6 +17,7 @@ interface PageWrapperProps {
     category?: string;
     producer?: string;
     section?: string;
+    collection?: string;
   };
 }
 
@@ -43,14 +44,15 @@ const PageWrapper: React.FC<PageWrapperProps> = ({ initialData, initialFilters }
     fats_from: '',
     fats_to: '',
     carbs_from: '',
-    carbs_to: ''
+    carbs_to: '',
+    collection: initialFilters.collection || ''
   });
-  
+
   const token = getCookie('accessToken');
-  
+
   // Ref для хранения таймера debounce
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Функция для проверки, является ли блюдо "скоро в продаже"
   const isSoon = useCallback((d: Dish) => !d.is_available || Boolean(d.start_sales_at), []);
   
@@ -126,7 +128,7 @@ const PageWrapper: React.FC<PageWrapperProps> = ({ initialData, initialFilters }
       if (allFilters.carbs_to) filters.carbs__lte = allFilters.carbs_to;
 
       const fetchedDishes = await getDishes(filters);
-      setDishes(fetchedDishes);
+      setDishes(fetchedDishes.results);
     } catch (error) {
       console.error('Error fetching dishes:', error);
     } finally {
@@ -157,10 +159,10 @@ const PageWrapper: React.FC<PageWrapperProps> = ({ initialData, initialFilters }
   }, [debouncedFetchDishes]);
 
   const handleFilterChange = useCallback((newFilters: Record<string, unknown>) => {
-    setAllFilters((prev: Record<string, unknown>) => ({
+    setAllFilters((prev) => ({
       ...prev,
       ...newFilters
-    }));
+    } as any));
   }, []);
 
   return (

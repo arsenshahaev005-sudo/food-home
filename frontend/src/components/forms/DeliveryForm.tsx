@@ -24,8 +24,8 @@ interface DeliveryFormProps {
     intercom?: string;
     comment?: string;
   };
-  onDataChange?: (data: DeliveryFormData) => void;
-  onValidationChange?: (isValid: boolean) => void;
+  onDataChange?: (_data: DeliveryFormData) => void; // eslint-disable-line no-unused-vars
+  onValidationChange?: (_isValid: boolean) => void; // eslint-disable-line no-unused-vars
   autoSave?: boolean;
   autoSaveDelay?: number;
 }

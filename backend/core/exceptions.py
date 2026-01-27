@@ -3,8 +3,8 @@
 Все пользовательские исключения должны наследоваться от BaseAppException.
 """
 
-from typing import Optional, Dict, Any
 from http import HTTPStatus
+from typing import Any, Dict, Optional
 
 
 class BaseAppException(Exception):

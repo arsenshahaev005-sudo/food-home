@@ -2,16 +2,16 @@
 Сервис для управления реферальными бонусами.
 """
 
-from django.db.models import Q, Count, Sum, F
-from django.utils import timezone
-from datetime import datetime, timedelta
-from decimal import Decimal
-from typing import List, Dict, Optional
 import logging
 import secrets
 import string
+from datetime import timedelta
+from decimal import Decimal
+from typing import Dict, List, Optional
 
-from ..models import Order
+from django.db.models import Sum
+from django.utils import timezone
+
 from ..models_new import ReferralBonus
 
 logger = logging.getLogger(__name__)

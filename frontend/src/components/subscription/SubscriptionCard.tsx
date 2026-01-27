@@ -11,9 +11,9 @@ import { SubscriptionOrder as SubscriptionType } from '@/lib/api/subscriptionApi
 
 interface SubscriptionCardProps {
   subscription: SubscriptionType;
-  onResume?: (subscriptionId: string) => Promise<void>;
-  onPause?: (subscriptionId: string) => Promise<void>;
-  onCancel?: (subscriptionId: string) => Promise<void>;
+  onResume?: (_subscriptionId: string) => Promise<void>; // eslint-disable-line no-unused-vars
+  onPause?: (_subscriptionId: string) => Promise<void>; // eslint-disable-line no-unused-vars
+  onCancel?: (_subscriptionId: string) => Promise<void>; // eslint-disable-line no-unused-vars
   isUpdating?: boolean;
 }
 

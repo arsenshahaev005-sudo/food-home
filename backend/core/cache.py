@@ -2,11 +2,11 @@
 Улучшенная система кэширования для приложения.
 """
 
-from django.core.cache import cache
-from typing import Any, Optional, Union
 import hashlib
 import json
-from datetime import timedelta
+from typing import Any, Optional, Union
+
+from django.core.cache import cache
 
 
 class CacheService:

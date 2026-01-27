@@ -3,7 +3,9 @@ Middleware для добавления trace_id в контекст.
 """
 
 import uuid
+
 from django.utils.deprecation import MiddlewareMixin
+
 from .logging import trace_id_var, user_id_var
 
 

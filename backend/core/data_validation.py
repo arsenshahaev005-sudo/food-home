@@ -2,11 +2,13 @@
 Улучшенная система валидации данных для приложения.
 """
 
-from typing import Any, Dict, List, Optional, Union
-from decimal import Decimal
 import re
+from decimal import Decimal
+from typing import Any, Dict, List, Union
+
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator, validate_email
+
 from .validators import MoneyValidator, PhoneNumberValidator
 
 
@@ -29,8 +31,8 @@ class DataValidator:
         try:
             validate_email(email)
             return True
-        except ValidationError:
-            raise ValidationError(f"'{email}' is not a valid email address")
+        except ValidationError as err:
+            raise ValidationError(f"'{email}' is not a valid email address") from err
     
     @staticmethod
     def validate_phone(phone: str) -> bool:

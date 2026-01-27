@@ -27,10 +27,10 @@ interface UseOrderDraftReturn {
   loading: boolean;
   error: string | null;
   loadDrafts: () => Promise<void>;
-  loadDraft: (id: string) => Promise<void>;
-  saveDraft: (data: OrderDraftFormData) => Promise<OrderDraft | null>;
-  updateDraft: (id: string, data: Partial<OrderDraftFormData>) => Promise<OrderDraft | null>;
-  removeDraft: (id: string) => Promise<void>;
+  loadDraft: (id: string) => Promise<void>; // eslint-disable-line no-unused-vars
+  saveDraft: (data: OrderDraftFormData) => Promise<OrderDraft | null>; // eslint-disable-line no-unused-vars
+  updateDraft: (id: string, data: Partial<OrderDraftFormData>) => Promise<OrderDraft | null>; // eslint-disable-line no-unused-vars
+  removeDraft: (id: string) => Promise<void>; // eslint-disable-line no-unused-vars
   clearCurrentDraft: () => void;
 }
 

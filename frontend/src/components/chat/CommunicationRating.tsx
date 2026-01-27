@@ -10,10 +10,10 @@ import React, { useState } from 'react';
 import { CommunicationRating as CommunicationRatingType } from '@/lib/api/chatApi';
 
 interface CommunicationRatingProps {
-  orderId: string;
-  ratedUserId: string;
+  orderId: string; // eslint-disable-line no-unused-vars
+  ratedUserId: string; // eslint-disable-line no-unused-vars
   ratedUserName?: string;
-  onSubmit: (orderId: string, ratedUserId: string, rating: number, comment: string) => Promise<void>;
+  onSubmit: (orderId: string, ratedUserId: string, rating: number, comment: string) => Promise<void>; // eslint-disable-line no-unused-vars
   existingRating?: CommunicationRatingType | null;
   isSubmitting?: boolean;
 }

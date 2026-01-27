@@ -84,13 +84,6 @@ export interface Order {
   floor?: string;
   intercom?: string;
   delivery_comment?: string;
-  is_gift?: boolean;
-  recipient_phone?: string;
-  recipient_address_text?: string;
-  recipient_latitude?: number;
-  recipient_longitude?: number;
-  recipient_specified_time?: string;
-  gift_proof_image?: string | null;
   total_cooking_time?: number; // Added for cart optimization
 }
 

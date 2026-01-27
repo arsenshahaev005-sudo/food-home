@@ -165,7 +165,7 @@ export const api = {
       formData.append('reason', reason);
       formData.append('description', description);
       if (photos) {
-        photos.forEach((photo, index) => {
+        photos.forEach((photo) => {
           formData.append(`photos`, photo);
         });
       }
@@ -205,7 +205,6 @@ export const api = {
     requestCorrection: (reviewId: string, data: {
       refund_amount?: number;
       partial_refund?: number;
-      gift_voucher?: string;
       message: string;
     }) =>
       fetch(`${API_BASE_URL}/reviews/${reviewId}/request_correction/`, {
@@ -327,8 +326,9 @@ export {
   requestChange,
   confirmChange,
   updateProfile,
-  getGiftNotificationSettings,
-  updateGiftNotificationSettings,
+  uploadSellerLogo,
+  uploadDocument,
+  getFullImageUrl,
 } from './api/profileApi';
 
 // Re-export profile types
@@ -336,7 +336,10 @@ export type {
   Profile,
   PaymentMethod,
   UserDevice,
-  GiftNotificationSubscriptions,
+  WeeklyScheduleDay,
+  WeekDayKey,
+  DeliveryZone,
+  DeliveryPricingRule,
 } from './api/profileApi';
 
 // Re-export notification functions
@@ -384,6 +387,17 @@ export interface Dish {
   allow_preorder: boolean;
   is_available: boolean;
   is_top: boolean;
+  is_archived: boolean;
+  weight?: string;
+  composition?: string;
+  manufacturing_time?: string;
+  shelf_life?: string;
+  storage_conditions?: string;
+  dimensions?: string;
+  fillings?: string;
+  sales_count?: number;
+  max_quantity_per_order?: number | null;
+  start_sales_at?: string | null;
   calories?: number;
   carbs?: number;
   fats?: number;
@@ -393,6 +407,10 @@ export interface Dish {
   repeat_purchase_count?: number;
   rating?: number;
   reviews_count?: number;
+  views_count?: number;
+  in_cart_count?: number;
+  rating_count?: number;
+  sort_score?: number;
 }
 
 export interface Producer {
@@ -567,6 +585,134 @@ export const getOrders = async (token: string): Promise<Order[]> => {
   const data = await response.json();
   // API returns { results: Order[] } format
   return data.results || data;
+};
+
+// ============ Dish Management API functions ============
+
+/**
+ * Создать новое блюдо
+ */
+export const createDish = async (dishData: Partial<Dish>, token: string): Promise<Dish> => {
+  const response = await fetch(`${API_BASE_URL}/api/dishes/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(dishData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+/**
+ * Обновить блюдо
+ */
+export const updateDish = async (dishId: string, dishData: Partial<Dish>, token: string): Promise<Dish> => {
+  const response = await fetch(`${API_BASE_URL}/api/dishes/${dishId}/`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(dishData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+/**
+ * Удалить блюдо
+ */
+export const deleteDish = async (dishId: string, token: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/dishes/${dishId}/`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+};
+
+/**
+ * Загрузить фото блюда
+ */
+export const uploadDishPhoto = async (dishId: string, photoFile: File, token: string): Promise<Dish> => {
+  const formData = new FormData();
+  formData.append('photo', photoFile);
+
+  const response = await fetch(`${API_BASE_URL}/api/dishes/${dishId}/upload_photo/`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+/**
+ * Добавить дополнительное фото блюда
+ */
+export const addDishImage = async (dishId: string, imageFile: File, token: string): Promise<Dish> => {
+  const formData = new FormData();
+  formData.append('image', imageFile);
+
+  const response = await fetch(`${API_BASE_URL}/api/dishes/${dishId}/add_image/`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+/**
+ * Удалить фото блюда
+ */
+export const removeDishImage = async (dishId: string, imageId: string, token: string): Promise<Dish> => {
+  const response = await fetch(`${API_BASE_URL}/api/dishes/${dishId}/remove_image/?image_id=${imageId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
 };
 
 export default api;

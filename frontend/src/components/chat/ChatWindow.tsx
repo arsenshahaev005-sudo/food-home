@@ -12,7 +12,7 @@ import { ChatMessage } from '@/lib/api/chatApi';
 
 interface ChatWindowProps {
   messages: ChatMessage[];
-  onSendMessage: (content: string, mediaFile?: File) => Promise<void>;
+  onSendMessage: (content: string, mediaFile?: File) => Promise<void>; // eslint-disable-line no-unused-vars
   onMarkAsRead: () => Promise<void>;
   unreadCount: number;
   isSending?: boolean;

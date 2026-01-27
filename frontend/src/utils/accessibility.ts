@@ -242,30 +242,30 @@ export const sanitizeHTML = (html: string): string => {
 /**
  * Debounce function for performance
  */
-export const debounce = <T extends (...args: unknown[]) => unknown>(
+export const debounce = <T extends (..._args: unknown[]) => unknown>(
   func: T,
   wait: number
-): ((...args: Parameters<T>) => void) => {
-  let timeout: NodeJS.Timeout | null = null;
+): ((..._args: Parameters<T>) => void) => {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
 
-  return (...args: Parameters<T>) => {
+  return (..._args: Parameters<T>) => {
     if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
+    timeout = setTimeout(() => func(..._args), wait);
   };
 };
 
 /**
  * Throttle function for performance
  */
-export const throttle = <T extends (...args: unknown[]) => unknown>(
+export const throttle = <T extends (..._args: unknown[]) => unknown>(
   func: T,
   limit: number
-): ((...args: Parameters<T>) => void) => {
+): ((..._args: Parameters<T>) => void) => {
   let inThrottle: boolean;
 
-  return (...args: Parameters<T>) => {
+  return (..._args: Parameters<T>) => {
     if (!inThrottle) {
-      func(...args);
+      func(..._args);
       inThrottle = true;
       setTimeout(() => (inThrottle = false), limit);
     }
@@ -319,9 +319,10 @@ export const getScrollPosition = (): { x: number; y: number } => {
 /**
  * Scroll to an element smoothly
  */
+ 
 export const scrollToElement = (
   element: HTMLElement,
-  options: ScrollIntoViewOptions = { behavior: 'smooth', block: 'start' }
+  options: any = { behavior: 'smooth', block: 'start' }
 ): void => {
   element.scrollIntoView(options);
 };

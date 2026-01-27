@@ -1,6 +1,8 @@
+import React from "react";
 import Header from "@/components/Header";
 import MobileNavigation from "@/components/layout/MobileNavigation";
 import Footer from "@/components/Footer";
+import GlobalChat from "@/components/GlobalChat";
 
 export default function MainLayout({
   children,
@@ -15,6 +17,7 @@ export default function MainLayout({
       </main>
       <MobileNavigation />
       <Footer />
+      <GlobalChat />
     </div>
   );
 }

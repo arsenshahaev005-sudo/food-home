@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Filter, X, ChevronDown } from 'lucide-react';
 
 export interface ReviewFiltersProps {
@@ -10,7 +10,7 @@ export interface ReviewFiltersProps {
   withVideos?: boolean;
   withResponse?: boolean;
   dateRange?: 'all' | 'week' | 'month' | 'year';
-  onFiltersChange?: (filters: ReviewFiltersState) => void;
+  onFiltersChange?: (_filters: ReviewFiltersState) => void; // eslint-disable-line no-unused-vars
   className?: string;
 }
 
@@ -66,7 +66,7 @@ const ReviewFilters = ({
     }
   };
 
-  const handleKeyDown = (event: { key: string }, action: () => void) => {
+  const handleKeyDown = (event: React.KeyboardEvent, action: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       action();

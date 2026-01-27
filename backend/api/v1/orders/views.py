@@ -1,20 +1,21 @@
 """Orders API v1 views."""
 
 import logging
-from rest_framework import viewsets, status
+
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from api.models import Order
+from api.services.order_service import OrderService
 from api.v1.orders.serializers import (
     OrderAcceptSerializer,
-    OrderRejectSerializer,
     OrderCancelSerializer,
-    OrderListSerializer,
     OrderDetailSerializer,
+    OrderListSerializer,
+    OrderRejectSerializer,
 )
-from api.services.order_service import OrderService
 
 logger = logging.getLogger(__name__)
 

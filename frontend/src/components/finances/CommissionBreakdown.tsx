@@ -1,15 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CommissionBreakdown } from '../../lib/types';
-import { api } from '../../lib/api';
 
 interface CommissionBreakdownProps {
   token: string;
 }
 
-export default function CommissionBreakdown({ token }: CommissionBreakdownProps) {
-  const [breakdowns, setBreakdowns] = useState<CommissionBreakdown[]>([]);
+export default function CommissionBreakdownComponent({ token }: CommissionBreakdownProps) {
+  const [breakdowns, setBreakdowns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);

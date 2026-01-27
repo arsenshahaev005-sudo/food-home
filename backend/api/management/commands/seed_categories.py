@@ -1,5 +1,7 @@
 from django.core.management.base import BaseCommand
+
 from api.models import Category
+
 
 class Command(BaseCommand):
     help = 'Seed initial categories and subcategories'

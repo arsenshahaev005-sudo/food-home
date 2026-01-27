@@ -3,10 +3,11 @@ Management команда для обновления статистики по�
 Запускать каждую ночь через cron.
 """
 import logging
+
 from django.core.management.base import BaseCommand
 from django.db.models import Count
 
-from api.models import Order, Profile, Dish
+from api.models import Dish, Order
 from api.services.repeat_purchase_service import RepeatPurchaseService
 
 logger = logging.getLogger(__name__)

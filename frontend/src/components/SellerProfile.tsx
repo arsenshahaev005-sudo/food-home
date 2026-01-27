@@ -318,7 +318,7 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
     const token = getCookie("accessToken");
     if (!token) return;
 
-    const nextHidden = !Boolean((profile as any).is_hidden);
+    const nextHidden = !(profile as any).is_hidden;
     if (nextHidden) {
       if (!confirm("Закрыть магазин? Он перестанет отображаться в списке продавцов.")) return;
     }
@@ -1590,7 +1590,7 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
                                         if (pickupSaving) return;
                                         const token = getCookie("accessToken");
                                         if (!token) return;
-                                        const next = !Boolean((profile as any).pickup_enabled);
+                                        const next = !(profile as any).pickup_enabled;
                                         try {
                                             setPickupSaving(true);
                                             const updated = await updateProfile({ pickup_enabled: next } as any, token);

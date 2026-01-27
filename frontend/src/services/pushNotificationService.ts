@@ -124,7 +124,8 @@ export const getPushSubscription = async (
 /**
  * Show a local notification (for testing or fallback)
  */
-export const showLocalNotification = (title: string, options?: NotificationOptions): void => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const showLocalNotification = (title: string, options?: any): void => {
   if (!isPushNotificationSupported()) {
     console.warn('Push notifications are not supported');
     return;

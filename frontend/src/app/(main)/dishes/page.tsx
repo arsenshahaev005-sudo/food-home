@@ -1,4 +1,4 @@
-import { getCategories, getProducers, getDishes, type Dish } from "@/lib/api";
+import { getCategories, getProducers, getDishes } from "@/lib/api";
 import PageWrapper from "./page-wrapper";
 
 export default async function Page(
@@ -9,27 +9,31 @@ export default async function Page(
   const category = typeof sp?.category === "string" ? sp.category : undefined;
   const producer = typeof sp?.producer === "string" ? sp.producer : undefined;
   const section = typeof sp?.section === "string" ? sp.section : "all";
+  // Note: collection parameter is extracted but not used in API call yet
+  // as backend doesn't support collection filtering
+  const collection = typeof sp?.collection === "string" ? sp.collection : undefined;
 
   const [categories, producers, dishes] = await Promise.all([
-    getCategories({ only_roots: true }),
+    getCategories(),
     getProducers(),
     getDishes({ search, category, producer }),
   ]).catch((error) => {
     console.error('[Dishes Page] Error loading data:', error);
-    return [[], [], []];
+    return [[], [], []] as [any, any, any];
   });
 
   const initialFilters = {
     search,
     category,
     producer,
-    section
+    section,
+    collection
   };
 
   const initialData = {
-    categories,
-    producers,
-    dishes
+    categories: categories || [],
+    producers: Array.isArray(producers) ? producers : [],
+    dishes: Array.isArray(dishes) ? dishes : []
   };
 
   return <PageWrapper initialData={initialData} initialFilters={initialFilters} />;

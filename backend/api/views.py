@@ -1,639 +1,102 @@
-from rest_framework import viewsets
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.filters import SearchFilter
-from rest_framework.throttling import SimpleRateThrottle
+import logging
 import math
-from django_filters.rest_framework import DjangoFilterBackend
+import os
+import random
+import re
+import uuid
+from datetime import timedelta
+
+import requests
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.utils import OperationalError, ProgrammingError
-from django.utils.crypto import get_random_string
-import random
-import requests
-import uuid
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
-import os
-import re
-from django.conf import settings
-from rest_framework.decorators import action
-from datetime import timedelta
+from django.template.loader import render_to_string
 from django.utils import timezone
-import logging
+from django.utils.crypto import get_random_string
+from django.utils.html import strip_tags
+from django_filters.rest_framework import DjangoFilterBackend
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.filters import SearchFilter
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 
 logger = logging.getLogger(__name__)
-from django.db import models
-from django.db.models import Sum, Count, Avg
-from django.db.models.functions import TruncDate
 from decimal import Decimal
-from .models import (
-    Producer,
-    Dish,
-    Category,
-    Order,
-    Cart,
-    CartItem,
-    VerificationCode,
-    Profile,
-    PendingRegistration,
-    Dispute,
-    Payout,
-    ChatMessage,
-    ChatComplaint,
-    PromoCode,
-    Review,
-    PaymentMethod,
-    UserDevice,
-    Notification,
-    HelpArticle,
-    PendingChange,
-    Payment,
-    GiftOrder,
-    GiftProduct,
-    GiftActivationAttempt,
-    GiftCreateIdempotency,
-    FavoriteDish,
-    OrderDraft,
-)
-from rest_framework import serializers
-from .serializers import (
-    ProducerSerializer,
-    DishSerializer,
-    CategorySerializer,
-    OrderSerializer,
-    UserSerializer,
-    RegistrationSerializer,
-    AddressSerializer,
-    CartSerializer,
-    ChatMessageSerializer,
-    ChatComplaintSerializer,
-    PromoCodeSerializer,
-    ReviewSerializer,
-    ProfileSerializer,
-    PaymentMethodSerializer,
-    UserDeviceSerializer,
-    NotificationSerializer,
-    HelpArticleSerializer,
-    ChangeRequestSerializer,
-    ChangeConfirmSerializer,
-    GiftCreateSerializer,
-    GiftSerializer,
-    GiftPreviewSerializer,
-    GiftActivateSerializer,
-    GiftStatusSerializer,
-    FavoriteDishSerializer,
-    SearchHistorySerializer,
-    SavedSearchSerializer,
-    OrderDraftSerializer,
-    ReorderSerializer,
-)
 
+from django.db import models
+from django.db.models import Avg, Count, Sum
+from django.db.models.functions import TruncDate
+from rest_framework import serializers
 from rest_framework.filters import OrderingFilter
-from api.services.rating_service import RatingService
+
 from api.services.order_status import (
-    OrderStatusService,
-    OrderActor,
     InvalidOrderTransition,
+    OrderActor,
+    OrderStatusService,
     PermissionDeniedForTransition,
 )
 from api.services.payment_service import PaymentService
-from api.services.gift_service import (
-    GiftService,
-    GiftActivationContext,
-    PublicGiftService,
-    GiftCreateDTO,
-    GiftAnalyticsService,
+from api.services.rating_service import RatingService
+
+from .models import (
+    Cart,
+    CartItem,
+    Category,
+    ChatComplaint,
+    ChatMessage,
+    Dish,
+    Dispute,
+    FavoriteDish,
+    HelpArticle,
+    Notification,
+    Order,
+    OrderDraft,
+    Payment,
+    PaymentMethod,
+    Payout,
+    PendingChange,
+    PendingRegistration,
+    Producer,
+    Profile,
+    PromoCode,
+    Review,
+    UserDevice,
+    VerificationCode,
 )
-from api.services.order_service import OrderService
-
-
-def get_client_ip(request):
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(",")[0]
-    else:
-        ip = request.META.get("REMOTE_ADDR")
-    return ip
-
-
-class GiftTokenIPThrottle(SimpleRateThrottle):
-    scope = "gift_token_ip"
-
-    def get_cache_key(self, request, view):
-        token = view.kwargs.get("activation_token")
-        if not token:
-            return None
-        ident = self.get_ident(request)
-        return f"gift:{token}:{ident}"
-
-
-class GiftTokenThrottle(SimpleRateThrottle):
-    scope = "gift_token"
-
-    def get_cache_key(self, request, view):
-        token = view.kwargs.get("activation_token")
-        if not token:
-            return None
-        return f"gift_token:{token}"
-
-
-class GiftNotifyThrottle(SimpleRateThrottle):
-    scope = "gift_notify"
-
-    def get_cache_key(self, request, view):
-        order_id = view.kwargs.get("pk")
-        if not order_id:
-            return None
-        if getattr(request, "user", None) and request.user.is_authenticated:
-            ident = f"user:{request.user.id}"
-        else:
-            ident = f"ip:{self.get_ident(request)}"
-        return f"gift_notify:{order_id}:{ident}"
-
-
-def track_device(user, request):
-    ip = get_client_ip(request)
-    user_agent = request.META.get("HTTP_USER_AGENT", "")
-    device, created = UserDevice.objects.update_or_create(
-        user=user,
-        user_agent=user_agent,
-        defaults={
-            "ip_address": ip,
-            "last_active": timezone.now(),
-        },
-    )
-    device_name = "Unknown Device"
-    if "Mobile" in user_agent:
-        device_name = "Mobile"
-    elif "Windows" in user_agent:
-        device_name = "Windows PC"
-    elif "Macintosh" in user_agent:
-        device_name = "Mac"
-    elif "Linux" in user_agent:
-        device_name = "Linux PC"
-    else:
-        device_name = "Desktop"
-    if "Chrome" in user_agent:
-        device_name += " (Chrome)"
-    elif "Firefox" in user_agent:
-        device_name += " (Firefox)"
-    elif "Safari" in user_agent and "Chrome" not in user_agent:
-        device_name += " (Safari)"
-    elif "Edge" in user_agent:
-        device_name += " (Edge)"
-    device.name = device_name
-    device.save()
-
-
-def _update_gift_details_logic(request, pk):
-    order = Order.objects.filter(id=pk, is_gift=True).first()
-    if not order or not order.recipient_phone:
-        return Response(
-            {"detail": "Not a gift order or no phone"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    token = request.data.get("recipient_token")
-    if not token or token != order.recipient_token:
-        return Response(
-            {"detail": "Invalid recipient token"}, status=status.HTTP_400_BAD_REQUEST
-        )
-    if (
-        order.recipient_token_expires_at
-        and order.recipient_token_expires_at < timezone.now()
-    ):
-        return Response(
-            {"detail": "recipient_link_expired"}, status=status.HTTP_400_BAD_REQUEST
-        )
-    address = request.data.get("address")
-    time_str = request.data.get("time")
-    delivery_type_raw = request.data.get("delivery_type")
-    entrance = request.data.get("entrance")
-    apartment = request.data.get("apartment")
-    floor = request.data.get("floor")
-    intercom = request.data.get("intercom")
-    if address:
-        order.recipient_address_text = address
-    if delivery_type_raw in dict(Order.DELIVERY_TYPE_CHOICES):
-        order.delivery_type = delivery_type_raw
-    if entrance is not None:
-        order.entrance = str(entrance)
-    if apartment is not None:
-        order.apartment = str(apartment)
-    if floor is not None:
-        order.floor = str(floor)
-    if intercom is not None:
-        order.intercom = str(intercom)
-    delivery_lat_raw = request.data.get("recipient_latitude")
-    delivery_lon_raw = request.data.get("recipient_longitude")
-    producer = order.dish.producer
-    zone_for_distance = None
-    distance_km = None
-    if (
-        producer.latitude is not None
-        and producer.longitude is not None
-        and delivery_lat_raw not in (None, "")
-        and delivery_lon_raw not in (None, "")
-    ):
-        try:
-            lat1 = float(producer.latitude)
-            lon1 = float(producer.longitude)
-            lat2 = float(delivery_lat_raw)
-            lon2 = float(delivery_lon_raw)
-            distance_km = _haversine_km(lat1, lon1, lat2, lon2)
-            if producer.delivery_zones:
-                zones_sorted = sorted(
-                    producer.delivery_zones or [],
-                    key=lambda z: float(z.get("radius_km") or 0),
-                )
-                for z in zones_sorted:
-                    try:
-                        radius = float(z.get("radius_km") or 0)
-                    except (TypeError, ValueError):
-                        continue
-                    if radius <= 0:
-                        continue
-                    if distance_km <= radius:
-                        zone_for_distance = z
-                        break
-        except (TypeError, ValueError):
-            distance_km = None
-    if (
-        producer.delivery_zones
-        and distance_km is not None
-        and zone_for_distance is None
-    ):
-        if delivery_lat_raw not in (None, "") and delivery_lon_raw not in (None, ""):
-            order.recipient_latitude = delivery_lat_raw
-            order.recipient_longitude = delivery_lon_raw
-        order.status = "CANCELLED"
-        order.recipient_token = None
-        order.recipient_token_expires_at = None
-        order.save()
-        return Response(
-            {
-                "detail": "Адрес получателя вне зоны доставки, заказ отменен",
-                "status": order.status,
-            }
-        )
-    if not producer.delivery_zones and distance_km is not None:
-        try:
-            radius = float(producer.delivery_radius_km)
-            if distance_km > radius:
-                if delivery_lat_raw not in (None, "") and delivery_lon_raw not in (
-                    None,
-                    "",
-                ):
-                    order.recipient_latitude = delivery_lat_raw
-                    order.recipient_longitude = delivery_lon_raw
-                order.status = "CANCELLED"
-                order.recipient_token = None
-                order.recipient_token_expires_at = None
-                order.save()
-                return Response(
-                    {
-                        "detail": "Адрес получателя вне зоны доставки, заказ отменен",
-                        "status": order.status,
-                    }
-                )
-        except (TypeError, ValueError):
-            pass
-    if delivery_lat_raw not in (None, "") and delivery_lon_raw not in (None, ""):
-        try:
-            order.recipient_latitude = float(delivery_lat_raw)
-            order.recipient_longitude = float(delivery_lon_raw)
-        except (TypeError, ValueError):
-            pass
-    parsed_time = None
-    raw_time = None
-    if time_str:
-        raw_time = time_str
-        from django.utils.dateparse import parse_datetime
-
-        normalized = time_str
-        if isinstance(normalized, str) and normalized.endswith("Z"):
-            normalized = normalized[:-1] + "+00:00"
-        parsed_time = parse_datetime(normalized)
-    base_minutes = int(order.dish.cooking_time_minutes)
-    zone_time = 0
-    if zone_for_distance is not None:
-        try:
-            zone_time_val = int(zone_for_distance.get("time_minutes") or 0)
-            if zone_time_val > 0:
-                zone_time = zone_time_val
-        except (TypeError, ValueError):
-            zone_time = 0
-    total_minutes = base_minutes + zone_time
-    order.estimated_cooking_time = total_minutes
-    if parsed_time is not None:
-        now = timezone.now()
-        minimal_dt = now + timedelta(minutes=total_minutes)
-        if parsed_time > now and parsed_time < minimal_dt:
-            return Response(
-                {
-                    "detail": "Получатель не может выбрать время раньше минимального срока приготовления и доставки",
-                    "min_available_time": minimal_dt,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        order.recipient_specified_time = parsed_time
-    elif raw_time is not None:
-        order.recipient_specified_time = raw_time
-    now = timezone.now()
-    minutes_to_accept = 30 if order.is_urgent else 60
-    order.acceptance_deadline = now + timedelta(minutes=minutes_to_accept)
-    order.status = "WAITING_FOR_ACCEPTANCE"
-    order.save()
-    service = GiftService()
-    ctx = GiftActivationContext(
-        order=order,
-        recipient_user=(
-            request.user if request.user and request.user.is_authenticated else None
-        ),
-    )
-    service.activate_from_order(ctx)
-    order.recipient_token = None
-    order.recipient_token_expires_at = None
-    order.save(update_fields=["recipient_token", "recipient_token_expires_at"])
-    return Response(
-        {
-            "detail": "Данные для подарка обновлены, ожидается подтверждение продавца",
-            "status": order.status,
-        }
-    )
-
-
-def moderate_shop_name(name: str):
-    def _strip_text(text: str) -> str:
-        return (text or "").strip()
-
-    def _contains_emoji(text: str) -> bool:
-        return bool(re.search(r"[\U0001F300-\U0001FAFF]", text))
-
-    def _contains_links_or_contacts(text: str) -> bool:
-        lowered = text.lower()
-        if re.search(r"https?://", lowered) or re.search(r"\bwww\.", lowered):
-            return True
-        if re.search(r"\b[\w\.-]+@[\w\.-]+\.\w+\b", lowered):
-            return True
-        if re.search(r"(@|#)\w+", lowered):
-            return True
-        if re.search(r"\+?\d[\d\s\-\(\)]{8,}\d", text):
-            return True
-        return False
-
-    def _caps_ratio(text: str) -> float:
-        letters = [c for c in text if c.isalpha()]
-        if not letters:
-            return 0.0
-        uppers = [c for c in letters if c.isupper()]
-        return len(uppers) / max(1, len(letters))
-
-    def _contains_profanity(text: str) -> bool:
-        lowered_raw = (text or "").lower().replace("ё", "е")
-        if re.search(r"\b(?:porn|xxx|viagra|casino)\b", lowered_raw):
-            return True
-
-        translit_map = str.maketrans(
-            {
-                "a": "а",
-                "b": "в",
-                "c": "с",
-                "e": "е",
-                "k": "к",
-                "m": "м",
-                "o": "о",
-                "p": "р",
-                "t": "т",
-                "x": "х",
-                "y": "у",
-            }
-        )
-        lowered = lowered_raw.translate(translit_map)
-        tokenized = re.sub(r"[^a-zа-я0-9]+", " ", lowered, flags=re.IGNORECASE)
-        tokens = [re.sub(r"(.)\1{2,}", r"\1\1", t) for t in tokenized.split() if t]
-        joined = "".join(tokens)
-        joined_latin = re.sub(r"[^a-z]+", "", lowered_raw, flags=re.IGNORECASE)
-
-        banned = [
-            "хуй",
-            "хуе",
-            "хуя",
-            "пизд",
-            "бля",
-            "сука",
-            "сучк",
-            "пидор",
-            "пидар",
-            "мудак",
-            "гандон",
-            "шлюх",
-            "залуп",
-            "дроч",
-            "ебан",
-            "ебат",
-            "ебл",
-            "ебн",
-            "ебуч",
-        ]
-        banned_latin = [
-            "huy",
-            "xuy",
-            "pizd",
-            "blya",
-            "suka",
-            "pidor",
-            "pidar",
-            "mudak",
-            "gandon",
-            "shlyuh",
-            "shluh",
-            "zalup",
-            "droch",
-            "eban",
-            "ebat",
-            "ebl",
-            "ebn",
-            "ebuch",
-        ]
-
-        if any(b in joined for b in banned):
-            return True
-        if any(b in joined_latin for b in banned_latin):
-            return True
-        return False
-
-    def basic_shop_name_checks(v: str):
-        n = _strip_text(v)
-        if not n:
-            return {"approved": False, "reason": "empty"}
-        if len(n) < 2 or len(n) > 60:
-            return {"approved": False, "reason": "length"}
-        if _contains_links_or_contacts(n):
-            return {"approved": False, "reason": "links_or_contacts"}
-        if _contains_emoji(n):
-            return {"approved": False, "reason": "emoji"}
-        if _caps_ratio(n) > 0.75 and len(n) >= 8:
-            return {"approved": False, "reason": "too_much_caps"}
-        if _contains_profanity(n):
-            return {"approved": False, "reason": "profanity"}
-        return {"approved": True, "reason": "basic_ok"}
-
-    def ollama_chat(model: str, messages: list, timeout_s: int = 12):
-        base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-        resp = requests.post(
-            f"{base}/api/chat",
-            json={
-                "model": model,
-                "messages": messages,
-                "stream": False,
-                "options": {"temperature": 0},
-            },
-            timeout=timeout_s,
-        )
-        if resp.status_code != 200:
-            raise RuntimeError(f"ollama_status_{resp.status_code}")
-        data = resp.json() or {}
-        msg = data.get("message") or {}
-        return (msg.get("content") or "").strip()
-
-    def ollama_guard_moderate_shop_name(v: str):
-        model = os.getenv("OLLAMA_GUARD_MODEL", "llama-guard3")
-        content = ollama_chat(
-            model,
-            [
-                {
-                    "role": "system",
-                    "content": "You are a content safety classifier. Decide if the user-provided shop name is safe for a food marketplace. Output only ALLOW or BLOCK.",
-                },
-                {"role": "user", "content": v},
-            ],
-            timeout_s=10,
-        )
-        up = (content or "").strip().upper()
-        if up.startswith("ALLOW"):
-            return {"approved": True, "reason": "ollama_guard"}
-        if up.startswith("BLOCK"):
-            return {"approved": False, "reason": "ollama_guard_block"}
-        if "ALLOW" in up and "BLOCK" not in up:
-            return {"approved": True, "reason": "ollama_guard_soft"}
-        if "BLOCK" in up:
-            return {"approved": False, "reason": "ollama_guard_soft_block"}
-        return {"approved": False, "reason": "ollama_guard_unknown"}
-
-    n = _strip_text(name)
-    basic = basic_shop_name_checks(n)
-    if not basic.get("approved"):
-        return basic
-
-    try:
-        return ollama_guard_moderate_shop_name(n)
-    except Exception:
-        pass
-    return {"approved": True, "reason": "ollama_unavailable_basic_ok"}
-
-
-def sanitize_shop_text(text: str, max_len: int):
-    t = (text or "").strip()
-    t = re.sub(r"https?://\S+", "", t, flags=re.IGNORECASE)
-    t = re.sub(r"\bwww\.\S+", "", t, flags=re.IGNORECASE)
-    t = re.sub(r"\bt\.me/\S+", "", t, flags=re.IGNORECASE)
-    t = re.sub(r"\b[\w\.-]+@[\w\.-]+\.\w+\b", "", t, flags=re.IGNORECASE)
-    t = re.sub(r"\+?\d[\d\s\-\(\)]{8,}\d", "", t)
-    t = re.sub(r"(@|#)\w+", "", t)
-    t = re.sub(r"[\U0001F300-\U0001FAFF]", "", t)
-    t = re.sub(
-        r"\b(?:telegram|телеграм|whatsapp|ватсап|viber|вайбер|instagram|инстаграм|vk|вк|facebook|фейсбук)\b",
-        "",
-        t,
-        flags=re.IGNORECASE,
-    )
-    t = re.sub(r"\s{2,}", " ", t).strip()
-    if max_len and len(t) > max_len:
-        t = t[:max_len].rstrip()
-    return t
-
-
-def _create_producer_for_user(user, shop_name=None, city="Москва"):
-    """
-    Автоматическое создание Producer профиля для пользователя.
-    Используется при первой попытке входа как SELLER.
-    
-    Args:
-        user: Объект User
-        shop_name: Название магазина (опционально)
-        city: Город (по умолчанию "Москва")
-    
-    Returns:
-        tuple: (success: bool, producer: Producer or None, message: str)
-    """
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    try:
-        # Проверяем, что у пользователя еще нет Producer
-        if _safe_has_producer(user):
-            logger.info(f"User {user.email} already has Producer profile, skipping creation")
-            return True, user.producer, "Producer profile already exists"
-        
-        # Генерируем название магазина, если не предоставлено
-        if not shop_name:
-            shop_name = f"Магазин {user.first_name or user.email.split('@')[0]}"
-        
-        # Проверяем название магазина через модерацию
-        moderation = moderate_shop_name(shop_name)
-        if not moderation.get("approved"):
-            logger.warning(f"Shop name '{shop_name}' did not pass moderation for user {user.email}")
-            return False, None, f"Shop name moderation failed: {moderation.get('reason', 'unknown')}"
-        
-        logger.info(f"Creating Producer for user {user.email} with shop name: {shop_name}")
-        
-        # Создаем Producer профиль
-        with transaction.atomic():
-            producer = Producer.objects.create(
-                user=user,
-                name=shop_name,
-                city=city,
-                description="",
-                short_description=""
-            )
-            logger.info(f"Producer created successfully - ID: {producer.id}, User: {user.email}, Name: {producer.name}")
-        
-        return True, producer, "Producer profile created successfully"
-    
-    except Exception as e:
-        logger.error(f"Error creating Producer for user {user.email}: {str(e)}", exc_info=True)
-        return False, None, f"Error creating Producer: {str(e)}"
-
-
-def ollama_chat_once(model: str, system: str, user: str, timeout_s: int = 18):
-    base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-    resp = requests.post(
-        f"{base}/api/chat",
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            "stream": False,
-            "options": {"temperature": 0.4},
-        },
-        timeout=timeout_s,
-    )
-    if resp.status_code != 200:
-        raise RuntimeError(f"ollama_status_{resp.status_code}")
-    data = resp.json() or {}
-    msg = data.get("message") or {}
-    return (msg.get("content") or "").strip()
+from .serializers import (
+    AddressSerializer,
+    CartSerializer,
+    CategorySerializer,
+    ChangeConfirmSerializer,
+    ChangeRequestSerializer,
+    ChatComplaintSerializer,
+    ChatMessageSerializer,
+    DishSerializer,
+    FavoriteDishSerializer,
+    HelpArticleSerializer,
+    NotificationSerializer,
+    OrderDraftSerializer,
+    OrderSerializer,
+    PaymentMethodSerializer,
+    ProducerSerializer,
+    ProfileSerializer,
+    PromoCodeSerializer,
+    RegistrationSerializer,
+    ReorderSerializer,
+    ReviewSerializer,
+    SavedSearchSerializer,
+    SearchHistorySerializer,
+    UserDeviceSerializer,
+)
 
 
 class ShopDescriptionAIView(APIView):
@@ -845,6 +308,7 @@ class ProducerViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         import logging
         import time
+
         from django.db import connection
         
         logger = logging.getLogger(__name__)
@@ -876,13 +340,13 @@ class ProducerViewSet(viewsets.ModelViewSet):
 
         # We can annotate 'is_new'
         from django.db.models import (
-            Case,
-            When,
-            Value,
             BooleanField,
+            Case,
+            ExpressionWrapper,
             F,
             FloatField,
-            ExpressionWrapper,
+            Value,
+            When,
         )
 
         queryset = queryset.annotate(
@@ -949,6 +413,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         import logging
         import time
+
         from django.db import connection
         
         logger = logging.getLogger(__name__)
@@ -1011,7 +476,7 @@ class ChatComplaintViewSet(viewsets.ModelViewSet):
         serializer.save(reporter=self.request.user)
 
 
-from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.filters import OrderingFilter, SearchFilter
 
 
 class DishViewSet(viewsets.ModelViewSet):
@@ -1059,9 +524,9 @@ class DishViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         import logging
-        from django.db import connection
-        from django.utils import timezone
         import time
+
+        from django.db import connection
         
         logger = logging.getLogger(__name__)
         start_time = time.time()
@@ -2524,8 +1989,6 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return Response({"detail": "Order cancelled"})
 
-    @action(detail=True, methods=["post"], throttle_classes=[GiftNotifyThrottle])
-    def notify_gift_recipient(self, request, pk=None):
         order = self.get_object()
         actor_role = self._get_order_actor_role(order)
         if actor_role not in ["SELLER", "ADMIN"]:
@@ -2641,16 +2104,6 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=True, methods=["post"])
-    def update_gift_details(self, request, pk=None):
-        return _update_gift_details_logic(request, pk)
-
-
-class OrderUpdateGiftDetailsView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request, pk):
-        return _update_gift_details_logic(request, pk)
 
 
 class OrderPayView(APIView):
@@ -2897,9 +2350,9 @@ class RegisterView(APIView):
                 )
             except Exception as e:
                 print(f"Error sending email: {e}")
-                print(f"============================================")
+                print("============================================")
                 print(f"REGISTER EMAIL CODE for {email}: {code}")
-                print(f"============================================")
+                print("============================================")
                 return Response(
                     {
                         "detail": "Ошибка отправки email. Проверьте адрес или попробуйте позже."
@@ -3313,492 +2766,6 @@ def _normalize_delivery_pricing_rules(value):
     return normalized
 
 
-GIFT_BULK_MAX_ITEMS = 100
-GIFT_NOTIFICATION_ALLOWED_CHANNELS = {"email", "push", "crm"}
-
-
-class GiftCreateView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        serializer = GiftCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        product_id = serializer.validated_data["product_id"]
-        product = GiftProduct.objects.filter(id=product_id, active=True).first()
-        if not product:
-            return Response(
-                {"detail": "Gift product not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-        payer = request.user
-        idempotency_key = (
-            request.headers.get("Idempotency-Key")
-            or serializer.validated_data.get("idempotency_key")
-            or ""
-        )
-        if idempotency_key:
-            with transaction.atomic():
-                (
-                    record,
-                    created,
-                ) = GiftCreateIdempotency.objects.select_for_update().get_or_create(
-                    idempotency_key=idempotency_key
-                )
-                if record.gift_id:
-                    data = GiftSerializer(record.gift).data
-                    return Response(data, status=status.HTTP_200_OK)
-                service = PublicGiftService()
-                gift = service.create_gift(
-                    payer=payer,
-                    product=product,
-                    recipient_contact_email=serializer.validated_data.get(
-                        "recipient_email"
-                    )
-                    or "",
-                    recipient_contact_phone=serializer.validated_data.get(
-                        "recipient_phone"
-                    )
-                    or "",
-                    recipient_name=serializer.validated_data.get("recipient_name")
-                    or "",
-                )
-                record.gift = gift
-                record.save(update_fields=["gift", "updated_at"])
-                data = GiftSerializer(gift).data
-                return Response(data, status=status.HTTP_201_CREATED)
-        service = PublicGiftService()
-        gift = service.create_gift(
-            payer=payer,
-            product=product,
-            recipient_contact_email=serializer.validated_data.get("recipient_email")
-            or "",
-            recipient_contact_phone=serializer.validated_data.get("recipient_phone")
-            or "",
-            recipient_name=serializer.validated_data.get("recipient_name") or "",
-        )
-        data = GiftSerializer(gift).data
-        return Response(data, status=status.HTTP_201_CREATED)
-
-
-class GiftBulkCreateView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        serializer = GiftCreateSerializer(data=request.data, many=True)
-        serializer.is_valid(raise_exception=True)
-        items = serializer.validated_data
-        if not items:
-            return Response([], status=status.HTTP_200_OK)
-        if len(items) > GIFT_BULK_MAX_ITEMS:
-            return Response(
-                {
-                    "detail": f"Too many gifts in one request (max {GIFT_BULK_MAX_ITEMS})"
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        product_ids = {item["product_id"] for item in items}
-        products = GiftProduct.objects.filter(id__in=product_ids, active=True)
-        product_map = {p.id: p for p in products}
-        missing = [pid for pid in product_ids if pid not in product_map]
-        if missing:
-            return Response(
-                {
-                    "detail": "Gift product not found",
-                    "missing_product_ids": [str(pid) for pid in missing],
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        payer = request.user
-        service = PublicGiftService()
-        dtos = []
-        for item in items:
-            product = product_map[item["product_id"]]
-            dto = GiftCreateDTO(
-                product=product,
-                recipient_contact_email=item.get("recipient_email") or "",
-                recipient_contact_phone=item.get("recipient_phone") or "",
-                recipient_name=item.get("recipient_name") or "",
-                idempotency_key=item.get("idempotency_key") or "",
-            )
-            dtos.append(dto)
-        gifts = service.create_bulk_gifts(payer=payer, items=dtos)
-        data = GiftSerializer(gifts, many=True).data
-        return Response(data, status=status.HTTP_200_OK)
-
-
-class GiftPreviewView(APIView):
-    permission_classes = [AllowAny]
-    throttle_classes = [GiftTokenIPThrottle, GiftTokenThrottle]
-
-    def get(self, request, activation_token):
-        gift = (
-            GiftOrder.objects.select_related(
-                "gift_product", "gift_product__base_dish", "payer"
-            )
-            .filter(activation_token=activation_token)
-            .first()
-        )
-        if not gift:
-            return Response(
-                {"detail": "Gift not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-        ip = get_client_ip(request)
-        user_agent = request.META.get("HTTP_USER_AGENT", "")
-        GiftActivationAttempt.objects.create(
-            gift=gift,
-            ip=ip,
-            user_agent=user_agent,
-            action="PREVIEW",
-            outcome=GiftActivationAttempt.Outcome.ATTEMPTED,
-        )
-        gift.last_activation_attempt_at = timezone.now()
-        gift.last_activation_ip = ip
-        gift.last_activation_user_agent = user_agent
-        gift.save(
-            update_fields=[
-                "last_activation_attempt_at",
-                "last_activation_ip",
-                "last_activation_user_agent",
-                "updated_at",
-            ]
-        )
-        product = gift.gift_product
-        dish = getattr(product, "base_dish", None) if product else None
-        service = PublicGiftService()
-        activatable = service.check_activatable(gift)
-        donor = gift.payer
-        donor_name = ""
-        if donor:
-            full_name = (donor.get_full_name() or "").strip()
-            donor_name = full_name or donor.email or ""
-        payload = {
-            "product_name": dish.name if dish else "",
-            "product_description": dish.description if dish else "",
-            "amount": gift.amount,
-            "donor_public_name": donor_name or "Даритель",
-            "recipient_message": "",
-            "is_activatable": activatable["is_activatable"],
-            "reason_not_activatable": activatable["reason"],
-        }
-        data = GiftPreviewSerializer(payload).data
-        return Response(data)
-
-
-class GiftActivateView(APIView):
-    permission_classes = [AllowAny]
-    throttle_classes = [GiftTokenIPThrottle, GiftTokenThrottle]
-
-    def post(self, request, activation_token):
-        serializer = GiftActivateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        ip = get_client_ip(request)
-        user_agent = request.META.get("HTTP_USER_AGENT", "")
-        gift = GiftOrder.objects.filter(activation_token=activation_token).first()
-        if not gift:
-            return Response(
-                {"detail": "Gift not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-        GiftActivationAttempt.objects.create(
-            gift=gift,
-            ip=ip,
-            user_agent=user_agent,
-            action="ACTIVATE",
-            outcome=GiftActivationAttempt.Outcome.ATTEMPTED,
-        )
-        User = get_user_model()
-        if request.user and request.user.is_authenticated:
-            recipient_user = request.user
-        else:
-            recipient_email = gift.recipient_contact_email
-            existing = None
-            if recipient_email:
-                existing = User.objects.filter(email__iexact=recipient_email).first()
-            if existing:
-                recipient_user = existing
-            else:
-                username = (
-                    gift.recipient_contact_email or f"gift_{uuid.uuid4().hex[:12]}"
-                )
-                recipient_user = User.objects.create_user(
-                    username=username, email=gift.recipient_contact_email or ""
-                )
-        service = PublicGiftService()
-        try:
-            gift, order = service.activate_gift(
-                activation_token=activation_token,
-                recipient_user=recipient_user,
-                activation_data=serializer.validated_data,
-                activation_ip=ip,
-                activation_user_agent=user_agent,
-            )
-        except ValueError as e:
-            code = str(e)
-            if code in (
-                "gift_not_available",
-                "gift_expired",
-                "payment_not_completed",
-                "gift_not_configured",
-                "recipient_phone_required",
-            ):
-                return Response({"detail": code}, status=status.HTTP_400_BAD_REQUEST)
-            return Response(
-                {"detail": "activation_failed"}, status=status.HTTP_400_BAD_REQUEST
-            )
-        return Response(
-            {
-                "gift_id": str(gift.id),
-                "order_id": str(order.id),
-                "gift_state": gift.state,
-                "order_state": order.status,
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
-
-class GiftCancelView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, gift_id):
-        gift = GiftOrder.objects.filter(id=gift_id, payer=request.user).first()
-        if not gift:
-            return Response(
-                {"detail": "Gift not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-        service = PublicGiftService()
-        gift = service.cancel_gift_by_payer(gift)
-        return Response(GiftStatusSerializer(gift, context={"request": request}).data)
-
-
-class GiftStatusView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, gift_id):
-        gift = (
-            GiftOrder.objects.select_related("order")
-            .filter(id=gift_id, payer=request.user)
-            .first()
-        )
-        if not gift:
-            return Response(
-                {"detail": "Gift not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-        data = GiftStatusSerializer(gift, context={"request": request}).data
-        return Response(data)
-
-
-class GiftMyListView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        direction = (request.query_params.get("direction") or "sent").lower()
-        qs = GiftOrder.objects.select_related("order")
-        user = request.user
-        if direction == "received":
-            qs = qs.filter(recipient_user=user)
-        else:
-            qs = qs.filter(payer=user)
-        state = request.query_params.get("state")
-        if state:
-            valid_states = {choice[0] for choice in GiftOrder.State.choices}
-            if state in valid_states:
-                qs = qs.filter(state=state)
-        from_param = request.query_params.get("from")
-        to_param = request.query_params.get("to")
-        if from_param or to_param:
-            from django.utils.dateparse import parse_datetime
-
-            if from_param:
-                dt_from = parse_datetime(from_param)
-                if dt_from:
-                    qs = qs.filter(created_at__gte=dt_from)
-            if to_param:
-                dt_to = parse_datetime(to_param)
-                if dt_to:
-                    qs = qs.filter(created_at__lte=dt_to)
-        qs = qs.order_by("-created_at")[:200]
-        serializer = GiftStatusSerializer(qs, many=True, context={"request": request})
-        return Response(serializer.data)
-
-
-class GiftStatsView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        raw_start = request.query_params.get("start")
-        raw_end = request.query_params.get("end")
-        now = timezone.now()
-        from django.utils.dateparse import parse_datetime
-
-        if raw_end:
-            end = parse_datetime(raw_end) or now
-        else:
-            end = now
-        if raw_start:
-            start = parse_datetime(raw_start)
-        else:
-            start = end - timedelta(days=30)
-        if not start:
-            start = end - timedelta(days=30)
-        if start > end:
-            start = end - timedelta(days=30)
-        service = GiftAnalyticsService()
-        recipient_user = None
-        recipient_me = request.query_params.get("recipient_me")
-        if isinstance(recipient_me, str) and recipient_me.lower() in (
-            "1",
-            "true",
-            "yes",
-        ):
-            recipient_user = request.user
-        data = service.get_statistics(
-            start=start, end=end, recipient_user=recipient_user
-        )
-        return Response(data)
-
-
-class GiftNotificationSettingsView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        profile, _ = Profile.objects.get_or_create(user=request.user)
-        prefs = profile.gift_notification_preferences or {}
-        return Response({"subscriptions": prefs})
-
-    def patch(self, request):
-        payload = request.data or {}
-        subscriptions = payload.get("subscriptions")
-        if not isinstance(subscriptions, dict):
-            return Response(
-                {"detail": "Invalid subscriptions"}, status=status.HTTP_400_BAD_REQUEST
-            )
-        cleaned = {}
-        for event_type, channels in subscriptions.items():
-            if not isinstance(channels, (list, tuple)):
-                continue
-            normalized = []
-            for ch in channels:
-                name = str(ch).lower()
-                if (
-                    name in GIFT_NOTIFICATION_ALLOWED_CHANNELS
-                    and name not in normalized
-                ):
-                    normalized.append(name)
-            if normalized:
-                cleaned[str(event_type)] = normalized
-        profile, _ = Profile.objects.get_or_create(user=request.user)
-        profile.gift_notification_preferences = cleaned
-        profile.save(update_fields=["gift_notification_preferences"])
-        return Response({"subscriptions": cleaned})
-
-
-def _normalize_delivery_zones(value):
-    if value is None:
-        return None
-    if not isinstance(value, list):
-        raise ValueError("delivery_zones должен быть массивом")
-
-    normalized = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-
-        name = str(item.get("name") or "").strip()
-        if not name:
-            name = f"Зона {len(normalized) + 1}"
-
-        radius_km = _parse_float(item.get("radius_km"))
-        if radius_km is None or radius_km <= 0:
-            continue
-
-        price_to_building = _parse_float(item.get("price_to_building"))
-        if price_to_building is None:
-            price_to_building = 0.0
-        if price_to_building < 0:
-            continue
-
-        price_to_door = _parse_float(item.get("price_to_door"))
-        if price_to_door is None:
-            price_to_door = 0.0
-        if price_to_door < 0:
-            continue
-
-        time_minutes = _parse_int(item.get("time_minutes"))
-        if time_minutes is None:
-            time_minutes = 60
-        if time_minutes <= 0:
-            continue
-
-        normalized.append(
-            {
-                "name": name,
-                "radius_km": radius_km,
-                "price_to_building": price_to_building,
-                "price_to_door": price_to_door,
-                "time_minutes": time_minutes,
-            }
-        )
-        if len(normalized) >= 10:
-            break
-
-    return normalized
-
-
-def _normalize_weekly_schedule(value):
-    if value is None:
-        return None
-    if not isinstance(value, list):
-        raise ValueError("weekly_schedule должен быть массивом")
-
-    days = [
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-        "sunday",
-    ]
-
-    by_day = {}
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        day = str(item.get("day") or "").strip().lower()
-        if day in days:
-            by_day[day] = item
-
-    normalized = []
-    for day in days:
-        src = by_day.get(day) or {}
-        if isinstance(src, dict):
-            parsed_247 = _parse_bool(src.get("is_247"))
-            is_247 = bool(parsed_247) if parsed_247 is not None else False
-        else:
-            is_247 = False
-        intervals_in = []
-        if isinstance(src, dict) and isinstance(src.get("intervals"), list):
-            intervals_in = src.get("intervals") or []
-
-        intervals = []
-        if not is_247:
-            for it in intervals_in:
-                if not isinstance(it, dict):
-                    continue
-                start = str(it.get("start") or "").strip()
-                end = str(it.get("end") or "").strip()
-                start_m = _parse_hhmm_to_minutes(start)
-                end_m = _parse_hhmm_to_minutes(end)
-                if start_m is None or end_m is None:
-                    continue
-                if end_m <= start_m:
-                    continue
-                intervals.append({"start": start, "end": end})
-
-            intervals = sorted(intervals, key=lambda x: x["start"])
-            intervals = intervals[:8]
-
-        normalized.append({"day": day, "is_247": is_247, "intervals": intervals})
-
-    return normalized
 
 
 class ProfileView(APIView):
@@ -4140,9 +3107,9 @@ class EmailLoginView(APIView):
                 VerificationCode.objects.create(user=user, code=code)
 
                 # For development/testing: Print code to console
-                print(f"============================================")
+                print("============================================")
                 print(f"SMS VERIFICATION CODE for {profile.phone}: {code}")
-                print(f"============================================")
+                print("============================================")
 
                 destination = "email"
                 if is_phone_login and profile.phone:
@@ -4389,11 +3356,11 @@ class ResendCodeView(APIView):
         VerificationCode.objects.create(user=user, code=code)
 
         # For development/testing: Print code to console
-        print(f"============================================")
+        print("============================================")
         print(
             f"RESENT SMS CODE for {user.profile.phone if is_phone_login else user.email}: {code}"
         )
-        print(f"============================================")
+        print("============================================")
 
         if is_phone_login and user.profile.phone:
             api_id = os.getenv("SMS_API_ID")
@@ -5060,22 +4027,14 @@ class ProfileChangeConfirmView(APIView):
 Этот файл будет объединен с views.py.
 """
 
-from rest_framework import viewsets, status
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import viewsets
 from rest_framework.decorators import action
-from django.db import transaction
-from django.utils import timezone
+from rest_framework.permissions import IsAuthenticated
 
-from .models import OrderDraft, Order, SearchHistory, SavedSearch
-from .serializers import (
-    OrderDraftSerializer,
-    ReorderSerializer,
-    SearchHistorySerializer,
-    SavedSearchSerializer,
-)
-from .services.order_service import OrderService
 from core.responses import APIResponse
+
+from .models import Order, SavedSearch, SearchHistory
+from .services.order_service import OrderService
 
 
 class OrderDraftViewSet(viewsets.ModelViewSet):

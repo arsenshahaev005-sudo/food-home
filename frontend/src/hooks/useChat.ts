@@ -18,12 +18,9 @@ import {
   updateMessageTemplate,
   deleteMessageTemplate,
   submitCommunicationRating,
-  getUserCommunicationRatings,
-  getAverageCommunicationRating,
   ChatMessage,
   ConversationPartner,
   MessageTemplate,
-  CommunicationRating,
 } from '@/lib/api/chatApi';
 
 export interface UseChatReturn {
@@ -37,19 +34,19 @@ export interface UseChatReturn {
   error: string | null;
 
   // Chat actions
-  loadConversation: (otherUserId: string) => Promise<void>;
+  loadConversation: () => Promise<void>;
   loadPartners: () => Promise<void>;
   loadTemplates: () => Promise<void>;
-  handleSendMessage: (recipientId: string, content: string, mediaFile?: File, orderId?: string) => Promise<void>;
-  handleMarkAsRead: (senderId: string) => Promise<void>;
-  handleArchive: (otherUserId: string) => Promise<void>;
-  handleCreateTemplate: (title: string, content: string) => Promise<void>;
-  handleUpdateTemplate: (templateId: string, title: string, content: string) => Promise<void>;
-  handleDeleteTemplate: (templateId: string) => Promise<void>;
-  handleSubmitRating: (orderId: string, ratedUserId: string, rating: number, comment: string) => Promise<void>;
+  handleSendMessage: () => Promise<void>;
+  handleMarkAsRead: () => Promise<void>;
+  handleArchive: () => Promise<void>;
+  handleCreateTemplate: () => Promise<void>;
+  handleUpdateTemplate: () => Promise<void>;
+  handleDeleteTemplate: () => Promise<void>;
+  handleSubmitRating: () => Promise<void>;
 }
 
-export const useChat = (token: string, currentUserId: string): UseChatReturn => {
+export const useChat = (token: string): UseChatReturn => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [partners, setPartners] = useState<ConversationPartner[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);

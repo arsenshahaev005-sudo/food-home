@@ -1,29 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { ShoppingBag, X } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
 
 export interface CartIconProps {
   itemCount?: number;
-  token?: string | null;
   className?: string;
 }
 
-const CartIcon = ({ itemCount = 0, token, className = '' }: CartIconProps) => {
+const CartIcon = ({ itemCount = 0, className = '' }: CartIconProps) => {
   const [isAnimating, setIsAnimating] = useState(false);
-  const [prevItemCount, setPrevItemCount] = useState(itemCount);
+  const prevItemCountRef = useRef(itemCount);
 
   useEffect(() => {
-    if (itemCount > prevItemCount) {
+    if (itemCount > prevItemCountRef.current) {
       setIsAnimating(true);
       setTimeout(() => setIsAnimating(false), 500);
     }
-    setPrevItemCount(itemCount);
-  }, [itemCount, prevItemCount]);
+    prevItemCountRef.current = itemCount;
+  }, [itemCount]);
 
-  const handleKeyDown = (event: { key: string }) => {
+  const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       window.location.href = '/cart';

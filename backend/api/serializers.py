@@ -1,32 +1,31 @@
-from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from rest_framework import serializers
+
 from .models import (
-    Producer,
-    Dish,
-    Category,
-    Order,
     Address,
     Cart,
     CartItem,
-    DishImage,
-    Dispute,
+    Category,
+    ChatComplaint,
     # Payout,  # Not used in this file
     ChatMessage,
-    ChatComplaint,
+    Dish,
+    DishImage,
+    DishTopping,
+    Dispute,
+    FavoriteDish,
+    HelpArticle,
+    Notification,
+    Order,
+    OrderDraft,
+    PaymentMethod,
+    Producer,
+    Profile,
     PromoCode,
     Review,
-    Profile,
-    PaymentMethod,
-    UserDevice,
-    Notification,
-    HelpArticle,
-    DishTopping,
-    GiftOrder,
-    GiftProduct,
-    FavoriteDish,
-    SearchHistory,
     SavedSearch,
-    OrderDraft,
+    SearchHistory,
+    UserDevice,
 )
 
 
@@ -70,101 +69,6 @@ class NotificationSerializer(serializers.ModelSerializer):
         model = Notification
         fields = "__all__"
         read_only_fields = ["user", "created_at", "title", "message", "type", "link"]
-
-
-class GiftProductSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = GiftProduct
-        fields = [
-            "id",
-            "type",
-            "base_dish",
-            "price",
-            "rules",
-            "rules_version",
-            "active",
-        ]
-        read_only_fields = ["rules_version"]
-
-
-class GiftCreateSerializer(serializers.Serializer):
-    product_id = serializers.UUIDField()
-    recipient_email = serializers.EmailField(
-        required=False, allow_null=True, allow_blank=True
-    )
-    recipient_phone = serializers.CharField(required=False, allow_blank=True)
-    recipient_name = serializers.CharField(required=False, allow_blank=True)
-    idempotency_key = serializers.CharField(
-        required=False, allow_blank=True, max_length=128
-    )
-
-
-class GiftSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = GiftOrder
-        fields = [
-            "id",
-            "state",
-            "amount",
-            "currency",
-            "valid_until",
-            "activation_token",
-            "gift_code",
-        ]
-        read_only_fields = fields
-
-
-class GiftPreviewSerializer(serializers.Serializer):
-    product_name = serializers.CharField()
-    product_description = serializers.CharField(allow_blank=True)
-    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    donor_public_name = serializers.CharField()
-    recipient_message = serializers.CharField(allow_blank=True)
-    is_activatable = serializers.BooleanField()
-    reason_not_activatable = serializers.CharField(allow_null=True, allow_blank=True)
-
-
-class GiftActivateSerializer(serializers.Serializer):
-    delivery_address = serializers.CharField()
-    delivery_type = serializers.ChoiceField(
-        choices=[("BUILDING", "BUILDING"), ("DOOR", "DOOR")], required=False
-    )
-    recipient_phone = serializers.CharField(required=False, allow_blank=True)
-    recipient_name = serializers.CharField(required=False, allow_blank=True)
-
-
-class GiftStatusSerializer(serializers.ModelSerializer):
-    order_state = serializers.CharField(source="order.status", read_only=True)
-    order_id = serializers.UUIDField(source="order.id", read_only=True)
-    direction = serializers.SerializerMethodField()
-
-    class Meta:
-        model = GiftOrder
-        fields = [
-            "id",
-            "state",
-            "valid_until",
-            "activated_at",
-            "amount",
-            "currency",
-            "order_id",
-            "order_state",
-            "created_at",
-            "direction",
-            "activation_token",
-            "gift_code",
-        ]
-        read_only_fields = fields
-
-    def get_direction(self, obj):
-        request = self.context.get("request")
-        user = getattr(request, "user", None) if request else None
-        if user and getattr(user, "is_authenticated", False):
-            if getattr(obj, "recipient_user_id", None) == user.id:
-                return "RECEIVED"
-            if getattr(obj, "payer_id", None) == user.id:
-                return "SENT"
-        return "UNKNOWN"
 
 
 class HelpArticleSerializer(serializers.ModelSerializer):
@@ -475,8 +379,9 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("promo_code_text", None)
-        from django.utils import timezone
         import uuid
+
+        from django.utils import timezone
 
         is_gift = validated_data.get("is_gift") or False
         if is_gift and not validated_data.get("recipient_token"):
@@ -857,8 +762,8 @@ class ChangeRequestSerializer(serializers.Serializer):
             )
 
         if change_type == "EMAIL":
-            from django.core.validators import validate_email
             from django.core.exceptions import ValidationError
+            from django.core.validators import validate_email
 
             try:
                 validate_email(new_value)

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { getOrders, approveOrderPhoto, createReview, updateReview, acceptReviewRefund, reorderOrder, getFullImageUrl, type Order, type Review } from "@/lib/api";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
 // I'll use a client-side way to get the token or pass it from a parent if possible.
 // Since this is a new page, I'll use a small helper to get the token from cookies on the client.
@@ -22,9 +21,7 @@ export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'cancelled'>('active');
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [highlightedOrder, setHighlightedOrder] = useState<string | null>(null);
-  const [showChat, setShowChat] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<Record<string, { role: 'user' | 'seller', text: string, time: string }[]>>({});
-  const [newMessage, setNewMessage] = useState("");
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, { taste: number; appearance: number; service: number; comment: string; photoFile?: File | null; photoPreview?: string | null; existingPhoto?: string | null }>>({});
   const [reviewSubmitting, setReviewSubmitting] = useState<string | null>(null);
 
@@ -147,47 +144,6 @@ export default function OrdersPage() {
     setExpandedOrder(expandedOrder === id ? null : id);
   };
 
-  const sendMessage = (orderId: string) => {
-    if (!newMessage.trim()) return;
-    const msg = { role: 'user' as const, text: newMessage, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    
-    // Save to localStorage for synchronization with more info
-    const currentOrder = orders.find(o => o.id === orderId);
-    const currentChats = JSON.parse(localStorage.getItem('order_chats') || '{}');
-    const orderMsgs = currentChats[orderId] || [];
-    const updatedMsgs = [...orderMsgs, msg];
-    
-    currentChats[orderId] = updatedMsgs;
-    if (currentOrder) {
-      const metadata = JSON.parse(localStorage.getItem('order_metadata') || '{}');
-      
-      const producerFirstName = (currentOrder as any).producer_first_name || '';
-      const producerLastName = (currentOrder as any).producer_last_name || '';
-      const sellerFullName = (producerFirstName || producerLastName) 
-        ? `${producerFirstName} ${producerLastName}`.trim() 
-        : ((currentOrder as any).producer_name || 'Продавец');
-
-      metadata[orderId] = {
-        dishName: currentOrder.dish.name,
-        dishPhoto: currentOrder.dish.photo,
-        userName: currentOrder.user_name,
-        sellerName: sellerFullName,
-        orderDate: new Date(currentOrder.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }),
-        quantity: currentOrder.quantity,
-        totalPrice: currentOrder.total_price
-      };
-      localStorage.setItem('order_metadata', JSON.stringify(metadata));
-    }
-    
-    localStorage.setItem('order_chats', JSON.stringify(currentChats));
-
-    setChatMessages(prev => ({
-      ...prev,
-      [orderId]: updatedMsgs
-    }));
-    setNewMessage("");
-  };
-
   useEffect(() => {
     // Poll for new messages from seller
     const interval = setInterval(() => {
@@ -279,7 +235,7 @@ export default function OrdersPage() {
     try {
       const updatedOrder = await approveOrderPhoto(orderId, token);
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: updatedOrder.status } : o));
-    } catch (e) {
+    } catch {
       alert("Ошибка при одобрении фото");
     }
   };
@@ -434,8 +390,7 @@ export default function OrdersPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4">
           {filteredOrders.map((order) => {
-            const isGift = !!order.is_gift;
-            const status = getStatusInfo(order.status, isGift);
+            const status = getStatusInfo(order.status, false);
             const isExpanded = expandedOrder === order.id;
             const baseReview = (order as any).review as Review | undefined;
             const currentDraft =
@@ -509,20 +464,7 @@ export default function OrdersPage() {
                               <span className="text-base font-bold text-[#c9825b]">{Math.round(parseFloat(order.total_price))} ₽</span>
                               <span className="text-gray-300">•</span>
                               <span className="text-sm text-gray-500 font-medium">{order.quantity} шт.</span>
-                              {isGift && (
-                                <>
-                                  <span className="text-gray-300">•</span>
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-pink-50 text-pink-600">
-                                    Подарок
-                                  </span>
-                                </>
-                              )}
                             </div>
-                            {giftSubstatus && (
-                              <div className="mt-1.5 text-[11px] text-pink-700 font-medium">
-                                {giftSubstatus}
-                              </div>
-                            )}
                             <div className="text-[11px] text-gray-400 mt-2 font-black uppercase tracking-tight">
                                 {new Date(order.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </div>
@@ -552,7 +494,7 @@ export default function OrdersPage() {
                           <div className="space-y-4">
                             <div>
                               <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                                {isGift ? "Отправитель" : "Получатель"}
+                                Получатель
                               </div>
                               <div className="text-sm font-bold text-gray-800">
                                 {order.user_name || "Не указано"}
@@ -560,22 +502,12 @@ export default function OrdersPage() {
                             </div>
                             <div>
                               <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                                {isGift ? "Телефон отправителя" : "Телефон"}
+                                Телефон
                               </div>
                               <div className="text-sm font-bold text-gray-800">
                                 {order.phone || "Не указано"}
                               </div>
                             </div>
-                            {isGift && (
-                              <div>
-                                <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                                  Телефон получателя
-                                </div>
-                                <div className="text-sm font-bold text-gray-800">
-                                  {order.recipient_phone || "Не указано"}
-                                </div>
-                              </div>
-                            )}
                             <div>
                               <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
                                 Тип доставки

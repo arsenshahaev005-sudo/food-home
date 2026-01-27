@@ -2,10 +2,11 @@
 Валидаторы для полей моделей и сериализаторов.
 """
 
+import re
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from decimal import Decimal
-import re
 
 
 class MoneyValidator:

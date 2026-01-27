@@ -2,13 +2,13 @@
 Сервис для бизнес-логики чата и коммуникации.
 """
 
-from django.db.models import Q, Count, Avg
-from django.utils import timezone
-from typing import List, Dict, Optional
 import logging
+from typing import Dict, List
 
-from ..models import ChatMessage, Order, Producer
-from ..models_new import MessageTemplate, CommunicationRating
+from django.db.models import Avg, Q
+
+from ..models import ChatMessage
+from ..models_new import CommunicationRating, MessageTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class ChatService:
         Возвращает список уникальных собеседников с информацией о последних сообщениях.
         """
         from django.contrib.auth import get_user_model
-        from django.db.models import Q, Max, Count
+        from django.db.models import Q
         
         User = get_user_model()
         

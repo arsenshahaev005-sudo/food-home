@@ -4,12 +4,14 @@
 
 import logging
 from decimal import Decimal
+
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
-from django.core.exceptions import ValidationError
 
-from api.models import Producer, Dish, Order
+from api.models import Dish, Order, Producer
+
 from .notifications import NotificationService
 from .payment_service import PaymentService
 

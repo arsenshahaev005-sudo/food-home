@@ -1,5 +1,6 @@
 """Reviews API v1 serializers."""
 from decimal import Decimal
+
 from rest_framework import serializers
 
 from api.models import Review

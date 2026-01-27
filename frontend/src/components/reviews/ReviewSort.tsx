@@ -1,12 +1,13 @@
 'use client';
 
+import React from 'react';
 import { ArrowUpDown } from 'lucide-react';
 
 export type ReviewSortOption = 'newest' | 'oldest' | 'highest' | 'lowest' | 'mostHelpful';
 
 export interface ReviewSortProps {
   value: ReviewSortOption;
-  onChange: (value: ReviewSortOption) => void;
+  onChange: (_value: ReviewSortOption) => void; // eslint-disable-line no-unused-vars
   className?: string;
 }
 
@@ -18,13 +19,6 @@ const ReviewSort = ({ value, onChange, className = '' }: ReviewSortProps) => {
     { value: 'lowest', label: 'По рейтингу (низкий)' },
     { value: 'mostHelpful', label: 'По полезности' }
   ];
-
-  const handleKeyDown = (event: { key: string }, optionValue: ReviewSortOption) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onChange(optionValue);
-    }
-  };
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>

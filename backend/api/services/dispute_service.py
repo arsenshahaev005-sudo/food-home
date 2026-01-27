@@ -1,10 +1,11 @@
-from decimal import Decimal
 import logging
+from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
 
-from api.models import Order, Dispute, Payment, Profile, Producer
+from api.models import Dispute, Order, Payment, Producer, Profile
+
 from .order_finance_service import OrderFinanceService
 from .payment_service import PaymentService
 from .penalties import PenaltyService
@@ -458,8 +459,9 @@ class DisputeService:
         """
         Отправить уведомление магазину о претензии.
         """
-        from .notifications import NotificationService
         from api.models import Notification
+
+        from .notifications import NotificationService
 
         notification_service = NotificationService()
 

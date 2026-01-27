@@ -9,9 +9,10 @@ Management команда для автоматической обработки
 """
 
 import logging
+
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 from django.db import transaction
+from django.utils import timezone
 
 from api.models import Order, Producer
 from api.services.order_service import OrderService

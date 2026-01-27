@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -39,8 +39,9 @@ function LoginForm() {
         saveAuthTokens(res.access, res.refresh || '', rememberMe);
         router.push("/profile");
         router.refresh();
-      } catch (err: any) {
-        setError(err?.detail || "Google login failed");
+      } catch (err: unknown) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setError((err as any)?.detail || "Google login failed");
       } finally {
         setLoading(false);
       }
@@ -90,8 +91,9 @@ function LoginForm() {
         }
         router.refresh();
       }
-    } catch (err: any) {
-       setError(err?.detail || "Неверный логин или пароль");
+    } catch (err: unknown) {
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       setError((err as any)?.detail || "Неверный логин или пароль");
     } finally {
       setLoading(false);
     }
@@ -104,15 +106,16 @@ function LoginForm() {
     try {
       const res = await verifyLogin2FA(emailFor2FA, verificationCode);
       saveAuthTokens(res.access, res.refresh || '', rememberMe);
-      
+
       if (res.role === 'SELLER') {
             router.push("/seller");
         } else {
             router.push("/profile");
         }
       router.refresh();
-    } catch (err: any) {
-      setError(err?.detail || "Неверный код");
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setError((err as any)?.detail || "Неверный код");
     } finally {
       setLoading(false);
     }
@@ -124,8 +127,9 @@ function LoginForm() {
     try {
       await resendCode(emailFor2FA);
       alert("Код отправлен повторно");
-    } catch (err: any) {
-      setError(err?.detail || "Ошибка отправки кода");
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setError((err as any)?.detail || "Ошибка отправки кода");
     } finally {
       setLoading(false);
     }

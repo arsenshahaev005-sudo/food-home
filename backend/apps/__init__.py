@@ -5,13 +5,12 @@ Each app is self-contained with its own models, views, serializers, and business
 """
 
 # Export all domain app configs for easy importing
-from apps.users.apps import UsersConfig
+from apps.cart.apps import CartConfig
 from apps.catalog.apps import CatalogConfig
 from apps.orders.apps import OrdersConfig
-from apps.producers.apps import ProducersConfig
-from apps.cart.apps import CartConfig
 from apps.payments.apps import PaymentsConfig
-from apps.gifts.apps import GiftsConfig
+from apps.producers.apps import ProducersConfig
+from apps.users.apps import UsersConfig
 
 __all__ = [
     'UsersConfig',
@@ -20,5 +19,4 @@ __all__ = [
     'ProducersConfig',
     'CartConfig',
     'PaymentsConfig',
-    'GiftsConfig',
 ]

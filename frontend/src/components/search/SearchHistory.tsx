@@ -19,7 +19,7 @@ interface SearchHistoryItem {
 
 interface SearchHistoryProps {
   token: string;
-  onSelect: (query: string) => void;
+  onSelect: (_query: string) => void; // eslint-disable-line no-unused-vars
 }
 
 const SearchHistory: React.FC<SearchHistoryProps> = ({ token, onSelect }) => {
