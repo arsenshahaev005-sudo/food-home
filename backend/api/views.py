@@ -46,6 +46,10 @@ from api.services.order_status import (
 )
 from api.services.payment_service import PaymentService
 from api.services.rating_service import RatingService
+from .views_helper import (
+    track_device,
+    moderate_shop_name,
+)
 
 from .models import (
     Cart,
@@ -3590,18 +3594,23 @@ class GoogleLoginView(APIView):
                 last_name = id_info.get("family_name", "")
 
             if not email:
+                logger.error("[Google Login] Email not found in token")
                 return Response(
                     {"detail": "Email не найден в токене Google", "error_code": "EMAIL_NOT_IN_TOKEN"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            logger.info(f"[Google Login] User email: {email}, Name: {first_name} {last_name}")
+            
             User = get_user_model()
 
             # Check if user exists
             try:
                 user = User.objects.get(email=email)
+                logger.info(f"[Google Login] Existing user found: {user.id}")
             except User.DoesNotExist:
                 # Create user
+                logger.info(f"[Google Login] Creating new user: {email}")
                 password = get_random_string(length=32)
                 user = User.objects.create_user(
                     username=email, email=email, password=password
@@ -3611,6 +3620,7 @@ class GoogleLoginView(APIView):
                 user.save()
 
                 Profile.objects.get_or_create(user=user)
+                logger.info(f"[Google Login] New user created: {user.id}")
 
             if role == "SELLER" and not _safe_has_producer(user):
                 shop_name = f"{first_name} {last_name}".strip() or "Новый продавец"
@@ -3661,6 +3671,7 @@ class GoogleLoginView(APIView):
                     pass
 
             # Generate JWT tokens
+            logger.info(f"[Google Login] Generating JWT tokens for user {user.id}")
             refresh = RefreshToken.for_user(user)
             refresh["role"] = role
             refresh.access_token["role"] = role
@@ -3671,26 +3682,27 @@ class GoogleLoginView(APIView):
 
             track_device(user, request)
 
-            return Response(
-                {
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh),
-                    "email": user.email,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "role": role,
-                }
-            )
+            response_data = {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": role,
+            }
+            logger.info(f"[Google Login] Success! Returning response with access token: {response_data['access'][:20]}...")
+            
+            return Response(response_data)
 
         except ValueError as e:
             # Invalid token
-            logger.warning(f"Google login - Invalid token: {str(e)}")
+            logger.error(f"[Google Login] ValueError: {str(e)}", exc_info=True)
             return Response(
                 {"detail": "Неверный токен Google", "error_code": "INVALID_GOOGLE_TOKEN"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
-            logger.error(f"Google login failed: {str(e)}")
+            logger.error(f"[Google Login] Unexpected error: {str(e)}", exc_info=True)
             return Response(
                 {"detail": "Ошибка входа через Google. Попробуйте позже.", "error_code": "GOOGLE_LOGIN_ERROR"},
                 status=status.HTTP_400_BAD_REQUEST,

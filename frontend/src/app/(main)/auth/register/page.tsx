@@ -36,20 +36,62 @@ function RegisterForm() {
     onSuccess: async (tokenResponse) => {
       setLoading(true);
       setError(null);
+      console.log('[Google Login] Token received:', {
+        access_token: tokenResponse.access_token.substring(0, 20) + '...',
+        expires_in: tokenResponse.expires_in,
+        scope: tokenResponse.scope
+      });
+      
       try {
+        console.log('[Google Login] Sending request to backend with role:', role);
         const res = await googleLogin(tokenResponse.access_token, role);
+        console.log('[Google Login] Backend response success:', {
+          hasAccess: !!res.access,
+          hasRefresh: !!res.refresh
+        });
+        
         saveAuthTokens(res.access, res.refresh || '', false);
         router.push("/profile");
         router.refresh();
       } catch (err: unknown) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setError((err as any)?.detail || "Google login failed");
+        const error = err as { error_code?: string; detail?: string; debug_info?: string };
+        console.error('[Google Login] Backend error:', {
+          error_code: error?.error_code,
+          detail: error?.detail,
+          debug_info: error?.debug_info
+        });
+        
+        // Обработка специфических кодов ошибок
+        if (error?.error_code === 'INVALID_GOOGLE_TOKEN') {
+          setError("Сессия Google истекла. Попробуйте снова.");
+        } else if (error?.error_code === 'GOOGLE_CONFIG_ERROR') {
+          setError("Ошибка конфигурации. Обратитесь в поддержку.");
+        } else if (error?.error_code === 'EMAIL_NOT_IN_TOKEN') {
+          setError("Email не найден в аккаунте Google. Проверьте настройки аккаунта.");
+        } else if (error?.error_code === 'TOKEN_REQUIRED') {
+          setError("Токен не получен. Попробуйте снова.");
+        } else {
+          setError(error?.detail || "Ошибка входа через Google. Попробуйте позже.");
+        }
       } finally {
         setLoading(false);
       }
     },
-    onError: () => setError("Google login failed"),
+    onError: (error) => {
+      console.error('[Google OAuth] OAuth error:', error);
+      setError("Не удалось войти через Google. Попробуйте другой способ входа.");
+    },
   });
+
+  useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      console.error('[Google OAuth] NEXT_PUBLIC_GOOGLE_CLIENT_ID not configured');
+      setError("Google OAuth не настроен. Обратитесь к администратору.");
+    } else {
+      console.log('[Google OAuth] Client ID configured');
+    }
+  }, []);
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
