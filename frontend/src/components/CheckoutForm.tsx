@@ -191,6 +191,8 @@ export default function CheckoutForm({
   const [acceptOffer, setAcceptOffer] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [acceptReceipts, setAcceptReceipts] = useState(false);
+  const [useAlternativeAddress, setUseAlternativeAddress] = useState(false);
+  const [askRecipientAddress, setAskRecipientAddress] = useState(false);
   const [deliveryEstimate, setDeliveryEstimate] = useState<{ delivery_price: number; total_price: number; estimated_cooking_time: number } | null>(null);
   const [deliveryEstimateLoading, setDeliveryEstimateLoading] = useState(false);
   const [deliveryEstimateError, setDeliveryEstimateError] = useState<string | null>(null);
@@ -559,6 +561,50 @@ export default function CheckoutForm({
       </div>
 
       <div className="space-y-3">
+        <div className="space-y-2">
+          <label className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useAlternativeAddress}
+              onChange={(e) => {
+                setUseAlternativeAddress(e.target.checked);
+                if (e.target.checked) {
+                  setAskRecipientAddress(false);
+                }
+              }}
+              className="mt-1 h-4 w-4 rounded border-gray-300"
+              style={{ accentColor: "#c9825b" }}
+            />
+            <div className="min-w-0">
+              <div className="font-black text-sm text-gray-900">Отправить на другой адрес</div>
+              <div className="text-xs" style={{ color: "#7c6b62" }}>
+                Укажите адрес получателя, отличный от адреса доставки
+              </div>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={askRecipientAddress}
+              onChange={(e) => {
+                setAskRecipientAddress(e.target.checked);
+                if (e.target.checked) {
+                  setUseAlternativeAddress(false);
+                }
+              }}
+              className="mt-1 h-4 w-4 rounded border-gray-300"
+              style={{ accentColor: "#c9825b" }}
+            />
+            <div className="min-w-0">
+              <div className="font-black text-sm text-gray-900">Узнать адрес у получателя</div>
+              <div className="text-xs" style={{ color: "#7c6b62" }}>
+                Продавец свяжется с получателем для уточнения адреса
+              </div>
+            </div>
+          </label>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <input
             value={name}
@@ -910,7 +956,7 @@ export function CheckoutModal({ items, token, defaultCity }: { items: Item[]; to
           <div
             role="dialog"
             aria-modal="true"
-            className="relative w-full max-w-2xl bg-card border border-[var(--border-warm)] rounded-[32px] shadow-[var(--shadow-soft)]"
+            className="relative w-full max-w-lg bg-card border border-[var(--border-warm)] rounded-[32px] shadow-[var(--shadow-soft)]"
           >
             <div className="flex items-center justify-between gap-3 px-5 md:px-6 py-4 border-b border-[var(--border-warm)]">
               <div className="min-w-0">

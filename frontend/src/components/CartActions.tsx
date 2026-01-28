@@ -262,9 +262,9 @@ export function CartItemControls({
   const setQty = async (nextQuantity: number) => {
     const withMin = Math.max(minQuantity, nextQuantity);
     const clamped = effectiveMax ? Math.min(effectiveMax, withMin) : withMin;
-    const nextItems = items.map((it) => 
-      (it.dish === dish && areToppingsEqual(it.selected_toppings, selectedToppings)) 
-        ? { ...it, quantity: clamped } 
+    const nextItems = items.map((it) =>
+      (it.dish === dish && areToppingsEqual(it.selected_toppings, selectedToppings))
+        ? { ...it, quantity: clamped }
         : it
     );
     setLoading(true);
@@ -277,7 +277,7 @@ export function CartItemControls({
   };
 
   const remove = async () => {
-    const nextItems = items.filter((it) => 
+    const nextItems = items.filter((it) =>
       !(it.dish === dish && areToppingsEqual(it.selected_toppings, selectedToppings))
     );
     setLoading(true);

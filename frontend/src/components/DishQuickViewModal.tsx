@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AddToCartButton } from "@/components/CartActions";
 import AddressCapsule from "@/components/AddressCapsule";
@@ -434,9 +435,9 @@ export default function DishQuickViewModal({
   const titleId = dishId ? `dish-modal-title-${dishId}` : "dish-modal-title";
   const descId = dishId ? `dish-modal-desc-${dishId}` : "dish-modal-desc";
 
-  if (!rendered) return null;
+  if (!rendered || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] overflow-hidden">
       {/* Backdrop/Overlay */}
       <div 
@@ -815,6 +816,7 @@ export default function DishQuickViewModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
