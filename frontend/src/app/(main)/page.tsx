@@ -4,17 +4,23 @@ import HomeCollections from "@/components/HomeCollections";
 import HeroSection from "@/components/home/HeroSection";
 import ReviewsSection from "@/components/home/ReviewsSection";
 
+// Disable caching for this page to always show fresh dishes
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function Home() {
   let dishes: Dish[] = [];
   let categories: Category[] = [];
   try {
     const res = await Promise.all([
-      getDishes({ is_archived: "false" }),
+      getDishes({ is_archived: false, is_available: true }),
       getCategories({ only_roots: true }),
     ]);
-    dishes = Array.isArray(res[0]) ? res[0] : [];
+    // getDishes returns { results: Dish[], count: number }
+    dishes = res[0] && Array.isArray(res[0].results) ? res[0].results : (Array.isArray(res[0]) ? res[0] : []);
     categories = Array.isArray(res[1]) ? res[1] : [];
-  } catch {
+  } catch (error) {
+    console.error('[Home Page] Failed to load data:', error);
     dishes = [];
     categories = [];
   }

@@ -59,8 +59,6 @@ const SellerReviews: React.FC<SellerReviewsProps> = ({ profile }) => {
       });
   }, [profile.producer_id]);
 
-  const reviewsCount = reviews.length;
-
   const filteredReviews = useMemo(() => {
     if (filter === 'all') {
       return reviews;

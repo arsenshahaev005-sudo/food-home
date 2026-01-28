@@ -22,11 +22,13 @@ export default function SearchBar() {
     if (!q || q.length < 2) { return; }
     timer.current = window.setTimeout(async () => {
       try {
-        const [dishes, cats, prods] = await Promise.all([
+        const [dishesResponse, cats, prods] = await Promise.all([
           getDishes({ search: q, is_available: "true" }),
           getCategories(),
           getProducers(),
         ]);
+        // getDishes returns { results: Dish[], count: number }
+        const dishes = dishesResponse && Array.isArray(dishesResponse.results) ? dishesResponse.results : [];
         setDishResults(dishes.slice(0, 5));
         setCatResults(cats.filter(c => c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 4));
         setProdResults(prods.filter(p => p.name.toLowerCase().includes(q.toLowerCase())).slice(0, 4));

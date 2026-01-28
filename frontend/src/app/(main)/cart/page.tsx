@@ -5,6 +5,10 @@ import { CartItemControls, CartItemSelectToggle, CartTotals, ClearCartButton } f
 import { CheckoutModal } from "@/components/CheckoutForm";
 import { CartDishQuickView } from "@/components/CartDishQuickView";
 
+// Disable caching for this page to always show fresh cart
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 function normalizeImageSrc(src?: string | null) {
   if (!src) return "";
   if (src.startsWith("http://") || src.startsWith("https://")) return src;

@@ -131,6 +131,7 @@ const Footer = () => {
                 rel="noopener noreferrer"
                 className="w-10 h-10 bg-[#e8dccf]/50 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-[#d4c8b8] transition-all duration-200"
                 aria-label="ВКонтакте"
+                suppressHydrationWarning
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M13.074 20.574h2.92v-5.465c0-2.827.676-4.483 3.224-4.483 1.455 0 2.427.973 2.427 2.427v2.923h-2.427c-1.915 0-2.427 1.27-2.427 2.427v2.171h4.854l-.539 2.923h-4.315v7.077z"/>
@@ -142,6 +143,7 @@ const Footer = () => {
                 rel="noopener noreferrer"
                 className="w-10 h-10 bg-[#e8dccf]/50 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-[#d4c8b8] transition-all duration-200"
                 aria-label="Telegram"
+                suppressHydrationWarning
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325l.59 3.462c.01.062.015.125.015.185 0 .145-.035.27-.115.338-.23l-1.417-.925-1.417.925a.484.484 0 0 1-.338.23c-.06 0-.123-.005-.185-.015l.59-3.462a.506.506 0 0 1 .171-.325c.144-.117.365-.142.465-.14h8.388z"/>
@@ -153,6 +155,7 @@ const Footer = () => {
                 rel="noopener noreferrer"
                 className="w-10 h-10 bg-[#e8dccf]/50 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-[#d4c8b8] transition-all duration-200"
                 aria-label="Instagram"
+                suppressHydrationWarning
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.204-.012 3.584-.07 4.85-.07 3.252-.148 4.771-1.691 4.919-4.919.058-1.265.069-1.645.069-4.849zm0-2.163c-3.204 0-3.584-.012-4.85-.07-3.252-.148-4.771-1.691-4.919-4.919.058-1.265.069-1.645.069-4.849z"/>
@@ -165,6 +168,7 @@ const Footer = () => {
                 rel="noopener noreferrer"
                 className="w-10 h-10 bg-[#e8dccf]/50 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-[#d4c8b8] transition-all duration-200"
                 aria-label="YouTube"
+                suppressHydrationWarning
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 14.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>

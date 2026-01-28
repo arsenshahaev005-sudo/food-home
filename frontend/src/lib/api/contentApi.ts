@@ -42,24 +42,58 @@ export interface MetaTags {
  * Получить все категории (публичный доступ)
  */
 export const getCategories = async (token?: string): Promise<Category[]> => {
-  if (token) {
-    return apiGetAuth<Category[]>('/api/categories/', token);
+  // Проверка токена: используем аутентификацию только если токен валидный
+  const isValidToken = token && token.trim().length > 0;
+  
+  let data: unknown;
+  
+  if (isValidToken) {
+    data = await apiGetAuth<Category[]>('/api/categories/', token);
+  } else {
+    // Публичный доступ без токена или с невалидным токеном
+    const response = await fetch(`${BASE_URL}/api/categories/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('getCategories error (public):', error);
+      throw error;
+    }
+    
+    data = await response.json();
   }
   
-  // Публичный доступ без токена
-  const response = await fetch(`${BASE_URL}/api/categories/`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw error;
+  // Handle different response formats
+  if (Array.isArray(data)) {
+    return data as Category[];
   }
   
-  return response.json();
+  // Handle object with results field (DRF pagination)
+  if (data && typeof data === 'object') {
+    const dataObj = data as Record<string, unknown>;
+    
+    // Check for results field
+    if ('results' in dataObj && Array.isArray(dataObj.results)) {
+      return dataObj.results as Category[];
+    }
+    
+    // Check for data field
+    if ('data' in dataObj && Array.isArray(dataObj.data)) {
+      return dataObj.data as Category[];
+    }
+    
+    // Check for count and results fields (DRF pagination)
+    if ('count' in dataObj && 'results' in dataObj && Array.isArray(dataObj.results)) {
+      return dataObj.results as Category[];
+    }
+  }
+
+  console.warn('getCategories: unexpected response format, returning empty array');
+  return [];
 };
 
 /**

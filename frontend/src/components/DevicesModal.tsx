@@ -95,8 +95,11 @@ export default function DevicesModal({
 
   if (!isOpen) return null;
 
-  const currentDevice = devices.find(d => d.is_current);
-  const otherDevices = devices.filter(d => !d.is_current);
+  // Ensure devices is an array
+  const safeDevices = Array.isArray(devices) ? devices : [];
+
+  const currentDevice = safeDevices.find(d => d.is_current);
+  const otherDevices = safeDevices.filter(d => !d.is_current);
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">

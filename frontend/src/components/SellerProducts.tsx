@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Dish, getDishes, updateDish, deleteDish, Category, getCategories, Profile, createDish, uploadDishPhoto, addDishImage, removeDishImage, BASE_URL } from "@/lib/api";
+import React, { useState, useEffect } from "react";
+import { Dish, getDishes, updateDish, deleteDish, Category, getCategories, Profile, createDish, uploadDishPhoto, addDishImage, removeDishImage } from "@/lib/api";
 
 interface SellerProductsProps {
   token: string;
@@ -37,14 +37,12 @@ const EMPTY_DISH: Partial<Dish> = {
 
 export default function SellerProducts({ token, profile }: SellerProductsProps) {
   const [dishes, setDishes] = useState<Dish[]>([]);
-  const [categories, setCategories] = useState<Category[]>([
-    { id: "fallback-1" as any, name: "Выпечка" },
-    { id: "fallback-2" as any, name: "Первые блюда" },
-    { id: "fallback-3" as any, name: "Вторые блюда" }
-  ]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [rootCategories, setRootCategories] = useState<Category[]>([]);
   const [selectedRootCategoryId, setSelectedRootCategoryId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState<Dish | null>(null);
   const [isPreviewing, setIsPreviewing] = useState<Dish | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -98,7 +96,7 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
       setForm(isEditing);
       setStartSalesAtLocal(isoToDatetimeLocal(isEditing.start_sales_at));
       setPhotoPreview(isEditing.photo || null);
-      setExtraPreviews(isEditing.images?.map((img: any) => ({ id: img.id, image: img.image })) || []);
+      setExtraPreviews(isEditing.images && isEditing.images.map((img: any) => ({ id: img.id, image: img.image })) || []);
       setImagesToDelete([]);
       
       if (isEditing.dimensions) {
@@ -140,8 +138,8 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
       setToppings(
         existingToppings.map((t: any) => ({
           id: t.id,
-          name: String(t.name ?? ""),
-          price: String(t.price ?? "0"),
+          name: String(t.name ? t.name : ""),
+          price: String(t.price ? t.price : "0"),
         }))
       );
 
@@ -160,15 +158,47 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
         } else if (rootCategories[0]) {
           setSelectedRootCategoryId(rootCategories[0].id);
         }
+        
+        // Validate category ID - if it's null UUID, clear it
+        const isValidUUID = (value: string | null | undefined): boolean => {
+          if (!value || value === "" || value === null || value === undefined) {
+            return false;
+          }
+          // Check for fallback and null UUID values
+          if (value.startsWith("fallback-") || value === "00000000-0000-0000-0000-000000000000") {
+            return false;
+          }
+          // Check for valid UUID format (simple check)
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          return uuidRegex.test(value);
+        };
+        
+        if (!isValidUUID(isEditing.category)) {
+          setForm(prev => ({ ...prev, category: "" as any }));
+        }
       }
     } else if (isCreating) {
       if (rootCategories.length > 0) {
         const defaultRoot = rootCategories[0];
         const firstSub = defaultRoot.subcategories && defaultRoot.subcategories[0];
         setSelectedRootCategoryId(defaultRoot.id);
-        setForm({ ...EMPTY_DISH, category: (firstSub?.id ?? "") as any });
+        // Only set category if it's a valid UUID (not null UUID)
+        const categoryId = (firstSub && firstSub.id ? firstSub.id : "") as any;
+        const isValidUUID = (value: string | null | undefined): boolean => {
+          if (!value || value === "" || value === null || value === undefined) {
+            return false;
+          }
+          // Check for fallback and null UUID values
+          if (value.startsWith("fallback-") || value === "00000000-0000-0000-0000-000000000000") {
+            return false;
+          }
+          // Check for valid UUID format (simple check)
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          return uuidRegex.test(value);
+        };
+        setForm({ ...EMPTY_DISH, category: isValidUUID(categoryId) ? categoryId : "" as any });
       } else {
-        setForm({ ...EMPTY_DISH, category: categories[0]?.id });
+        setForm({ ...EMPTY_DISH, category: "" as any });
       }
       setStartSalesAtLocal("");
       setPhotoPreview(null);
@@ -232,33 +262,22 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
 
   const loadData = async () => {
     setLoading(true);
-    console.log("loadData: Starting data fetch...");
+    setCategoriesLoaded(false);
+    setCategoriesError(null);
     
     // 1. Load Categories
     try {
-      let catsData: Category[] = [];
+      // getCategories теперь сама проверяет валидность токена
+      const catsData = await getCategories(token);
       
-      try {
-        // Use only_roots=true to get the hierarchy from the backend
-        catsData = await getCategories({ only_roots: true });
-        console.log("loadData: Categories from getCategories (roots):", catsData?.length);
-      } catch (err) {
-        console.warn("loadData: getCategories failed, trying direct fetch", err);
-        const response = await fetch(`${BASE_URL}/api/categories/?only_roots=true`, {
-          headers: { Accept: 'application/json' }
-        });
-        if (response.ok) {
-          catsData = await response.json();
-        }
-      }
-      
-      // Fallback: if no roots found, try getting all categories
+      // Process categories
       if (!Array.isArray(catsData) || catsData.length === 0) {
-        console.log("loadData: No root categories, fetching all...");
-        catsData = await getCategories();
-      }
-
-      if (Array.isArray(catsData) && catsData.length > 0) {
+        console.warn("loadData: No categories loaded from server. User won't be able to select category.");
+        setCategories([]);
+        setRootCategories([]);
+        setCategoriesLoaded(true);
+        setCategoriesError("Категории не загружены с сервера");
+      } else {
         const roots = catsData as Category[];
         setRootCategories(roots);
 
@@ -279,32 +298,33 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
 
         if (all.length > 0) {
           setCategories(all);
+          setCategoriesLoaded(true);
         } else {
           console.warn("loadData: Flattening resulted in empty list");
-          setCategories([
-            { id: "00000000-0000-0000-0000-000000000000" as any, name: "Общая категория" }
-          ]);
-          setRootCategories([
-            { id: "00000000-0000-0000-0000-000000000000" as any, name: "Общая категория" }
-          ]);
+          setCategories([]);
+          setRootCategories([]);
+          setCategoriesLoaded(true);
+          setCategoriesError("Подкатегории не найдены");
         }
-      } else {
-        console.warn("loadData: No categories found at all");
-        setCategories([
-          { id: "00000000-0000-0000-0000-000000000000" as any, name: "Общая категория" }
-        ]);
-        setRootCategories([
-          { id: "00000000-0000-0000-0000-000000000000" as any, name: "Общая категория" }
-        ]);
       }
     } catch (e) {
-      console.error("loadData: Critical error loading categories", e);
+      console.error("Failed to load categories:", e);
+      setCategories([]);
+      setRootCategories([]);
+      setCategoriesLoaded(true);
+      setCategoriesError(e && typeof e === 'object' && 'message' in e ? (e as any).message : "Ошибка при загрузке категорий");
     }
 
     // 2. Load Dishes
     try {
       const dishesData = await getDishes({ producer: profile.producer_id, is_archived: showArchived });
-      setDishes(dishesData.sort((a, b) => (b.sales_count || 0) - (a.sales_count || 0)));
+
+      // getDishes returns { results: Dish[], count: number }, so we need to extract results
+      const safeDishesData = dishesData && Array.isArray(dishesData.results)
+        ? dishesData.results
+        : (Array.isArray(dishesData) ? dishesData : []);
+
+      setDishes(safeDishesData.sort((a, b) => (b.sales_count || 0) - (a.sales_count || 0)));
     } catch (e) {
       console.error("loadData: Failed to load products", e);
     } finally {
@@ -343,6 +363,25 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
       return;
     }
 
+    // Validation for category
+    const isValidUUID = (value: string | null | undefined): boolean => {
+      if (!value || value === "" || value === null || value === undefined) {
+        return false;
+      }
+      // Check for fallback and null UUID values
+      if (value.startsWith("fallback-") || value === "00000000-0000-0000-0000-000000000000") {
+        return false;
+      }
+      // Check for valid UUID format (simple check)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(value);
+    };
+
+    if (!isValidUUID(form.category)) {
+      alert("Пожалуйста, выберите категорию товара из списка");
+      return;
+    }
+
     try {
       setSaving(true);
       let savedDish: Dish;
@@ -360,10 +399,17 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
       const cooking_time_minutes = (d * 24 * 60) + (h * 60) + m || 30;
 
       const start_sales_at = startSalesAtLocal
-        ? (datetimeLocalToIso(startSalesAtLocal) ?? form.start_sales_at ?? null)
+        ? (datetimeLocalToIso(startSalesAtLocal) ? datetimeLocalToIso(startSalesAtLocal) : (form.start_sales_at ? form.start_sales_at : null))
         : null;
 
-      const dataToSave: any = { ...form, start_sales_at, manufacturing_time, cooking_time_minutes };
+      const dataToSave: any = {
+        ...form,
+        start_sales_at,
+        manufacturing_time,
+        cooking_time_minutes,
+        // Only include category if it's a valid UUID
+        ...(isValidUUID(form.category) ? { category: form.category } : {})
+      };
 
       const normalizedToppings = (toppings || [])
         .map(t => {
@@ -417,6 +463,7 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
       setExtraPreviews([]);
     } catch (e: any) {
       console.error("Save error:", e);
+      
       let errorMsg = "Ошибка при сохранении товара";
       
       if (e && typeof e === 'object') {
@@ -474,7 +521,7 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const file = e.target.files && e.target.files[0];
     if (file) {
       setPhotoFile(file);
       setPhotoPreview(URL.createObjectURL(file));
@@ -496,7 +543,7 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
     try {
       const updated = await updateDish(dish.id, { is_available: !dish.is_available }, token);
       setDishes(dishes.map(d => d.id === dish.id ? updated : d));
-    } catch (e) {
+    } catch {
       alert("Ошибка при обновлении статуса");
     }
   };
@@ -506,7 +553,7 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
     try {
       await deleteDish(id, token);
       setDishes(dishes.filter(d => d.id !== id));
-    } catch (e) {
+    } catch {
       alert("Ошибка при удалении");
     }
   };
@@ -691,7 +738,7 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
                           try {
                             const updated = await updateDish(dish.id, { is_top: !dish.is_top }, token);
                             setDishes(dishes.map(d => d.id === dish.id ? updated : d));
-                          } catch (e) {
+                          } catch {
                             alert("Ошибка при обновлении статуса ТОП");
                           }
                         }}
@@ -779,58 +826,109 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-4">
-                      <div className="relative group">
-                        <label className="block text-sm font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Категория</label>
-                        <select 
-                          value={selectedRootCategoryId}
-                          onChange={e => {
-                            const newRootId = e.target.value;
-                            setSelectedRootCategoryId(newRootId);
-                            const root = rootCategories.find(c => c.id === newRootId);
-                            const firstSub = root?.subcategories && root.subcategories[0];
-                            setForm(prev => ({
-                              ...prev,
-                              category: (firstSub?.id ?? "") as any
-                            }));
-                          }}
-                          className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
-                        >
-                          <option value="" disabled>{loading ? "Загрузка..." : "Выберите категорию"}</option>
-                          {rootCategories.length > 0
-                            ? rootCategories.map(cat => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                              ))
-                            : categories.map(cat => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                              ))}
-                        </select>
-                      </div>
-
-                      <div className="relative group">
-                        <label className="block text-sm font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Подкатегория</label>
-                        <select 
-                          required
-                          value={form.category || ""}
-                          onChange={e => setForm({ ...form, category: e.target.value as any })}
-                          className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
-                        >
-                          <option value="" disabled>{loading ? "Загрузка..." : "Выберите подкатегорию"}</option>
-                          {(() => {
-                            if (rootCategories.length > 0 && selectedRootCategoryId) {
-                              const root = rootCategories.find(c => c.id === selectedRootCategoryId);
-                              const subs = root?.subcategories || [];
-                              if (subs.length > 0) {
-                                return subs.map(sub => (
-                                  <option key={sub.id} value={sub.id}>{sub.name}</option>
-                                ));
-                              }
+                    <div className="relative group">
+                      <label className="block text-sm font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Категория *</label>
+                      <select
+                        value={selectedRootCategoryId}
+                        onChange={e => {
+                          const newRootId = e.target.value;
+                          setSelectedRootCategoryId(newRootId);
+                          const root = rootCategories.find(c => c.id === newRootId);
+                          const firstSub = root && root.subcategories && root.subcategories[0];
+                          // Only set category if it's a valid UUID (not null UUID)
+                          const categoryId = (firstSub && firstSub.id ? firstSub.id : "") as any;
+                          const isValidUUID = (value: string | null | undefined): boolean => {
+                            if (!value || value === "" || value === null || value === undefined) {
+                              return false;
                             }
-                            return categories.map(cat => (
-                              <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ));
-                          })()}
-                        </select>
-                      </div>
+                            // Check for fallback and null UUID values
+                            if (value.startsWith("fallback-") || value === "00000000-0000-0000-0000-000000000000") {
+                              return false;
+                            }
+                            // Check for valid UUID format (simple check)
+                            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                            return uuidRegex.test(value);
+                          };
+                          setForm(prev => ({
+                            ...prev,
+                            category: isValidUUID(categoryId) ? categoryId : ""
+                          }));
+                        }}
+                        className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
+                      >
+                        <option value="">
+                          {loading ? "Загрузка категорий..." : "Выберите категорию"}
+                        </option>
+                        {rootCategories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                      {(() => {
+                        const shouldShowError = categoriesLoaded && rootCategories.length === 0 && categoriesError;
+                        if (shouldShowError) {
+                          console.log("Rendering category error:", {
+                            categoriesLoaded,
+                            rootCategoriesLength: rootCategories.length,
+                            categoriesLength: categories.length,
+                            categoriesError
+                          });
+                        }
+                        return shouldShowError;
+                      })() && (
+                        <div className="text-red-500 text-sm mt-1">
+                          {categoriesError}. Обновите страницу.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative group">
+                      <label className="block text-sm font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Подкатегория *</label>
+                      <select
+                        required
+                        value={form.category || ""}
+                        onChange={e => setForm({ ...form, category: e.target.value as any })}
+                        className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
+                      >
+                        <option value="">
+                          {loading ? "Загрузка подкатегорий..." : "Выберите подкатегорию"}
+                        </option>
+                        {(() => {
+                          console.log("Rendering subcategories:", {
+                            rootCategoriesLength: rootCategories.length,
+                            selectedRootCategoryId,
+                            categoriesLength: categories.length
+                          });
+                          if (rootCategories.length > 0 && selectedRootCategoryId) {
+                            const root = rootCategories.find(c => c.id === selectedRootCategoryId);
+                            const subs = root && root.subcategories ? root.subcategories : [];
+                            if (subs.length > 0) {
+                              return subs.map(sub => (
+                                <option key={sub.id} value={sub.id}>{sub.name}</option>
+                              ));
+                            }
+                          }
+                          return categories.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          ));
+                        })()}
+                      </select>
+                      {(() => {
+                        const shouldShowError = categoriesLoaded && categories.length === 0 && categoriesError;
+                        if (shouldShowError) {
+                          console.log("Rendering subcategory error:", {
+                            categoriesLoaded,
+                            categoriesLength: categories.length,
+                            rootCategoriesLength: rootCategories.length,
+                            categoriesError
+                          });
+                        }
+                        return shouldShowError;
+                      })() && (
+                        <div className="text-red-500 text-sm mt-1">
+                          {categoriesError}. Обновите страницу.
+                        </div>
+                      )}
+                    </div>
                     </div>
 
                     <div>
@@ -838,15 +936,15 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
                       <input 
                         type="number" 
                         required
-                        value={form.price ?? ""}
+                        value={form.price ? form.price : ""}
                         onChange={e => setForm(prev => ({ ...prev, price: e.target.value }))}
-                        onFocus={e => {
-                          if ((form.price ?? "") === "0") {
+                        onFocus={() => {
+                          if ((form.price ? form.price : "") === "0") {
                             setForm(prev => ({ ...prev, price: "" }));
                           }
                         }}
-                        onBlur={e => {
-                          if ((form.price ?? "") === "") {
+                        onBlur={() => {
+                          if ((form.price ? form.price : "") === "") {
                             setForm(prev => ({ ...prev, price: "0" }));
                           }
                         }}
@@ -933,12 +1031,12 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
                       </div>
                     </div>
                     
-                    {(form.discount_percentage ?? 0) > 0 && (
+                    {(form.discount_percentage ? form.discount_percentage : 0) > 0 && (
                       <div>
                         <label className="block text-sm font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Итоговая цена</label>
                         <div className="w-full px-6 py-4 bg-[#C9825B]/5 border border-[#C9825B]/10 rounded-2xl font-black text-[#C9825B] text-lg flex items-center justify-between">
-                          <span>{Math.round(parseFloat(form.price || "0") * (1 - (form.discount_percentage ?? 0) / 100))} ₽</span>
-                          <span className="text-xs font-bold uppercase tracking-widest px-2 py-1 bg-[#C9825B] text-white rounded-lg">Выгода {Math.round(parseFloat(form.price || "0") * ((form.discount_percentage ?? 0) / 100))} ₽</span>
+                          <span>{Math.round(parseFloat(form.price || "0") * (1 - (form.discount_percentage ? form.discount_percentage : 0) / 100))} ₽</span>
+                          <span className="text-xs font-bold uppercase tracking-widest px-2 py-1 bg-[#C9825B] text-white rounded-lg">Выгода {Math.round(parseFloat(form.price || "0") * ((form.discount_percentage ? form.discount_percentage : 0) / 100))} ₽</span>
                         </div>
                       </div>
                     )}
@@ -1085,7 +1183,7 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
                   <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Платные добавки</label>
                   <div className="flex flex-wrap gap-2 mb-3">
                     {toppings.map((t, i) => (
-                      <div key={t.id ?? i} className="flex items-center gap-3 px-3 py-1.5 bg-[#c9825b]/10 text-[#c9825b] rounded-xl text-sm font-bold border border-[#c9825b]/20 group">
+                      <div key={t.id ? t.id : i} className="flex items-center gap-3 px-3 py-1.5 bg-[#c9825b]/10 text-[#c9825b] rounded-xl text-sm font-bold border border-[#c9825b]/20 group">
                         <span>{t.name}</span>
                         <span className="text-xs text-[#c9825b]/80">+{t.price || "0"} ₽</span>
                         <button
@@ -1250,7 +1348,7 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
                     <img src={isPreviewing.photo} alt={isPreviewing.name} className="w-full h-full object-cover" />
                   </div>
                   <div className="grid grid-cols-3 gap-4">
-                    {isPreviewing.images?.map((img, idx) => (
+                    {isPreviewing.images && isPreviewing.images.map((img: any, idx: number) => (
                       <div key={idx} className="aspect-square rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-white">
                         <img src={img.image} alt={`Extra ${idx}`} className="w-full h-full object-cover" />
                       </div>
@@ -1263,7 +1361,10 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
                   <div>
                     <div className="flex items-center gap-3 mb-4">
                       <span className="px-3 py-1 bg-[#c9825b]/10 text-[#c9825b] rounded-full text-[10px] font-black uppercase tracking-wider">
-                        {categories.find(c => c.id === isPreviewing.category)?.name || 'Категория'}
+                        {(() => {
+                          const cat = categories.find(c => c.id === isPreviewing.category);
+                          return cat ? cat.name : 'Категория';
+                        })()}
                       </span>
                       {isPreviewing.start_sales_at && new Date(isPreviewing.start_sales_at) > new Date() && (
                         <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-wider">

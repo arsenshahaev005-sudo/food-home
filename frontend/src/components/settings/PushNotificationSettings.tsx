@@ -12,14 +12,12 @@ import {
 } from '@/services/pushNotificationService';
 
 interface PushNotificationSettingsProps {
-  token: string;
   applicationServerKey: string;
   serviceWorkerPath: string;
   onSuccess?: () => void;
 }
 
 const PushNotificationSettings = ({
-  token,
   applicationServerKey,
   serviceWorkerPath,
   onSuccess,

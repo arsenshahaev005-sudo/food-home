@@ -33,7 +33,8 @@ export default async function Page(
   const initialData = {
     categories: categories || [],
     producers: Array.isArray(producers) ? producers : [],
-    dishes: Array.isArray(dishes) ? dishes : []
+    // getDishes returns { results: Dish[], count: number }
+    dishes: dishes && Array.isArray(dishes.results) ? dishes.results : (Array.isArray(dishes) ? dishes : [])
   };
 
   return <PageWrapper initialData={initialData} initialFilters={initialFilters} />;

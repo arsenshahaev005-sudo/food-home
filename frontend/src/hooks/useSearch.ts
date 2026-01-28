@@ -99,7 +99,7 @@ export function useSearch(
 
   // Save search to history
   const handleSaveSearch = useCallback(async (name: string, queryParams: Record<string, any>) => {
-    if (!token || !query.trim()) return;
+    if (!token || !queryParams.trim()) return;
 
     try {
       // Save to history

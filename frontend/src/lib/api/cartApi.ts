@@ -147,7 +147,7 @@ export interface UpdateQuantityRequest {
  * Получить корзину текущего пользователя с полной информацией
  */
 export async function getCart(token: string): Promise<CartSummary> {
-  return apiGetAuth<CartSummary>('/api/cart/summary/', token);
+  return apiGetAuth<CartSummary>('/api/cart/', token);
 }
 
 /**
@@ -160,7 +160,7 @@ export async function addToCart(
   selectedToppings?: any[]
 ): Promise<CartItem> {
   return apiPost<CartItem>('/api/cart/add/', {
-    dish_id: dishId,
+    dish: dishId,  // Backend expects 'dish', not 'dish_id'
     quantity,
     selected_toppings: selectedToppings || []
   }, token);

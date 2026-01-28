@@ -1,12 +1,6 @@
 "use client";
 
-import { Profile } from "@/lib/api";
-
-interface SellerProgressProps {
-  profile: Profile;
-}
-
-export default function SellerProgress({ profile }: SellerProgressProps) {
+export default function SellerProgress() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
         <div>

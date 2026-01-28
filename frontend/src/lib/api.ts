@@ -9,6 +9,16 @@ export type { Order } from '../types/api';
 
 // Helper functions for authenticated requests
 export const apiGetAuth = async <T>(url: string, token: string): Promise<T> => {
+  // Проверка токена: выбрасываем ошибку если токен невалидный
+  if (!token || token.trim().length === 0) {
+    console.error('apiGetAuth: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      url
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+  
   const response = await fetch(`${API_BASE_URL}${url}`, {
     method: 'GET',
     headers: {
@@ -26,6 +36,16 @@ export const apiGetAuth = async <T>(url: string, token: string): Promise<T> => {
 };
 
 export const apiPostAuth = async <T>(url: string, token: string, data: any): Promise<T> => {
+  // Проверка токена
+  if (!token || token.trim().length === 0) {
+    console.error('apiPostAuth: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      url
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+  
   const response = await fetch(`${API_BASE_URL}${url}`, {
     method: 'POST',
     headers: {
@@ -44,6 +64,16 @@ export const apiPostAuth = async <T>(url: string, token: string, data: any): Pro
 };
 
 export const apiPutAuth = async <T>(url: string, token: string, data: any): Promise<T> => {
+  // Проверка токена
+  if (!token || token.trim().length === 0) {
+    console.error('apiPutAuth: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      url
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+  
   const response = await fetch(`${API_BASE_URL}${url}`, {
     method: 'PUT',
     headers: {
@@ -62,6 +92,16 @@ export const apiPutAuth = async <T>(url: string, token: string, data: any): Prom
 };
 
 export const apiDeleteAuth = async <T>(url: string, token: string): Promise<T> => {
+  // Проверка токена
+  if (!token || token.trim().length === 0) {
+    console.error('apiDeleteAuth: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      url
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+  
   const response = await fetch(`${API_BASE_URL}${url}`, {
     method: 'DELETE',
     headers: {
@@ -80,6 +120,16 @@ export const apiDeleteAuth = async <T>(url: string, token: string): Promise<T> =
 
 // Additional helper functions for API modules
 export const apiPost = async <T>(url: string, data: any, token: string): Promise<T> => {
+  // Проверка токена
+  if (!token || token.trim().length === 0) {
+    console.error('apiPost: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      url
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+  
   const response = await fetch(`${API_BASE_URL}${url}`, {
     method: 'POST',
     headers: {
@@ -98,6 +148,16 @@ export const apiPost = async <T>(url: string, data: any, token: string): Promise
 };
 
 export const apiPatch = async <T>(url: string, data: any, token: string): Promise<T> => {
+  // Проверка токена
+  if (!token || token.trim().length === 0) {
+    console.error('apiPatch: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      url
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+  
   const response = await fetch(`${API_BASE_URL}${url}`, {
     method: 'PATCH',
     headers: {
@@ -116,6 +176,16 @@ export const apiPatch = async <T>(url: string, data: any, token: string): Promis
 };
 
 export const apiDelete = async <T>(url: string, token: string): Promise<T> => {
+  // Проверка токена
+  if (!token || token.trim().length === 0) {
+    console.error('apiDelete: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      url
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+  
   const response = await fetch(`${API_BASE_URL}${url}`, {
     method: 'DELETE',
     headers: {
@@ -448,7 +518,8 @@ export interface DishFilters {
   search?: string;
   min_price?: number;
   max_price?: number;
-  is_available?: boolean;
+  is_available?: boolean | string;
+  is_archived?: boolean | string;
   is_top?: boolean;
   page?: number;
   page_size?: number;
@@ -467,7 +538,7 @@ export interface ProducerFilters {
  */
 export const getDishes = async (params?: DishFilters): Promise<{ results: Dish[]; count: number }> => {
   const queryParams = new URLSearchParams();
-  
+
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -475,23 +546,39 @@ export const getDishes = async (params?: DishFilters): Promise<{ results: Dish[]
       }
     });
   }
-  
+
   const queryString = queryParams.toString();
   const url = `/api/dishes/${queryString ? `?${queryString}` : ''}`;
-  
+
+  console.log('[getDishes] Fetching with params:', params);
+  console.log('[getDishes] URL:', `${API_BASE_URL}${url}`);
+
   const response = await fetch(`${API_BASE_URL}${url}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
     },
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
+    console.error('[getDishes] Error response:', error);
     throw error;
   }
-  
-  return response.json();
+
+  const responseData = await response.json();
+  console.log('[getDishes] Response data:', responseData);
+
+  // Backend returns { success: true, data: [...], pagination: { count: ... } }
+  // Transform to expected format { results: [...], count: ... }
+  const data = {
+    results: responseData.data || [],
+    count: responseData.pagination?.count || 0
+  };
+
+  console.log('[getDishes] Transformed data:', data);
+
+  return data;
 };
 
 /**

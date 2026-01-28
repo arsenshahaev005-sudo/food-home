@@ -242,30 +242,30 @@ export const sanitizeHTML = (html: string): string => {
 /**
  * Debounce function for performance
  */
-export const debounce = <T extends (..._args: unknown[]) => unknown>(
+export const debounce = <T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
-): ((..._args: Parameters<T>) => void) => {
+): ((...args: Parameters<T>) => void) => {
   let timeout: ReturnType<typeof setTimeout> | null = null;
 
-  return (..._args: Parameters<T>) => {
+  return (...args: Parameters<T>) => {
     if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => func(..._args), wait);
+    timeout = setTimeout(() => func(...args), wait);
   };
 };
 
 /**
  * Throttle function for performance
  */
-export const throttle = <T extends (..._args: unknown[]) => unknown>(
+export const throttle = <T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
-): ((..._args: Parameters<T>) => void) => {
+): ((...args: Parameters<T>) => void) => {
   let inThrottle: boolean;
 
-  return (..._args: Parameters<T>) => {
+  return (...args: Parameters<T>) => {
     if (!inThrottle) {
-      func(..._args);
+      func(...args);
       inThrottle = true;
       setTimeout(() => (inThrottle = false), limit);
     }

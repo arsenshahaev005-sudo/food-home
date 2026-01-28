@@ -143,7 +143,7 @@ const SavedSearches: React.FC<SavedSearchesProps> = ({ token, onSelect }) => {
         <p className="text-gray-500 text-center py-4">Нет сохраненных поисков</p>
       ) : (
         <div className="space-y-2 max-h-80 overflow-y-auto">
-          {savedSearches.map((search) => (
+          {Array.isArray(savedSearches) && savedSearches.map((search) => (
             <div
               key={search.id}
               className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 flex justify-between items-center group"

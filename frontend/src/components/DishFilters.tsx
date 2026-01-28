@@ -33,6 +33,10 @@ const DishFilters: React.FC<DishFiltersProps> = ({
   const [filters, setFilters] = useState(initialFilters);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Ensure categories is an array
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const safeProducers = Array.isArray(producers) ? producers : [];
+
   useEffect(() => {
     onFilterChange(filters);
   }, [filters, onFilterChange]);
@@ -88,7 +92,7 @@ const DishFilters: React.FC<DishFiltersProps> = ({
             style={{ borderColor: "var(--border-warm)", backgroundColor: "#fff9f3" }}
           >
             <option value="">Все категории</option>
-            {categories.map((cat) => (
+            {safeCategories.map((cat) => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
           </select>
@@ -103,7 +107,7 @@ const DishFilters: React.FC<DishFiltersProps> = ({
             style={{ borderColor: "var(--border-warm)", backgroundColor: "#fff9f3" }}
           >
             <option value="">Все производители</option>
-            {producers.map((prod) => (
+            {safeProducers.map((prod) => (
               <option key={prod.id} value={prod.id}>{prod.name}</option>
             ))}
           </select>

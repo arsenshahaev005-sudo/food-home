@@ -46,10 +46,6 @@ from api.services.order_status import (
 )
 from api.services.payment_service import PaymentService
 from api.services.rating_service import RatingService
-from .views_helper import (
-    track_device,
-    moderate_shop_name,
-)
 
 from .models import (
     Cart,
@@ -100,6 +96,10 @@ from .serializers import (
     SavedSearchSerializer,
     SearchHistorySerializer,
     UserDeviceSerializer,
+)
+from .views_helper import (
+    moderate_shop_name,
+    track_device,
 )
 
 

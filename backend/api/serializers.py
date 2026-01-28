@@ -304,15 +304,16 @@ class DishSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """
-        При создании нового товара должно быть минимум 3 фото.
+        При создании нового товара достаточно загрузить минимум 1 фото.
+        Дополнительные фото могут быть загружены отдельными запросами.
         """
-        # При создании нового товара должно быть минимум 3 фото
+        # При создании нового товара достаточно загрузить минимум 1 фото
         if self.instance is None:  # Создание нового товара
             request = self.context.get('request')
             if request and hasattr(request, 'FILES') and request.FILES:
                 images_count = len([k for k in request.FILES.keys() if k.startswith('image')])
-                if images_count < 3:
-                    raise serializers.ValidationError("Необходимо загрузить минимум 3 фотографии товара")
+                if images_count < 1:
+                    raise serializers.ValidationError("Необходимо загрузить минимум 1 фотографию товара")
         return data
 
 
