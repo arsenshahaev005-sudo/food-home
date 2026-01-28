@@ -330,6 +330,7 @@ export const api = {
 
 // Re-export cart functions with proper names
 export {
+  getCart,
   updateCartItemQuantity,
   saveForLater,
   getSavedItems,
@@ -377,8 +378,12 @@ export type {
   UpdateQuantityRequest,
 } from './api/cartApi';
 
+// Alias Cart to CartSummary for compatibility
+export type { CartSummary as Cart } from './api/cartApi';
+
 export type {
   Category,
+  CategoryFilters,
   BlogArticle,
   MetaTags,
 } from './api/contentApi';

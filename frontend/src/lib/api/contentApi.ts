@@ -38,54 +38,73 @@ export interface MetaTags {
   twitter_card?: string;
 }
 
+export interface CategoryFilters {
+  only_roots?: boolean;
+  parent?: string;
+}
+
 /**
  * Получить все категории (публичный доступ)
  */
-export const getCategories = async (token?: string): Promise<Category[]> => {
+export const getCategories = async (filters?: CategoryFilters, token?: string): Promise<Category[]> => {
+  // Build query string from filters
+  const params = new URLSearchParams();
+  if (filters) {
+    if (filters.only_roots !== undefined) {
+      params.append('only_roots', String(filters.only_roots));
+    }
+    if (filters.parent) {
+      params.append('parent', filters.parent);
+    }
+  }
+
+  const queryString = params.toString();
+  const url = queryString ? `/api/categories/?${queryString}` : '/api/categories/';
+
   // Проверка токена: используем аутентификацию только если токен валидный
-  const isValidToken = token && token.trim().length > 0;
-  
+  const isValidToken = token && typeof token === 'string' && token.trim().length > 0;
+
   let data: unknown;
-  
+
   if (isValidToken) {
-    data = await apiGetAuth<Category[]>('/api/categories/', token);
+    data = await apiGetAuth<Category[]>(url, token);
   } else {
     // Публичный доступ без токена или с невалидным токеном
-    const response = await fetch(`${BASE_URL}/api/categories/`, {
+    const response = await fetch(`${BASE_URL}${url}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       console.error('getCategories error (public):', error);
       throw error;
     }
-    
+
     data = await response.json();
   }
-  
+
   // Handle different response formats
   if (Array.isArray(data)) {
     return data as Category[];
   }
-  
+
   // Handle object with results field (DRF pagination)
   if (data && typeof data === 'object') {
     const dataObj = data as Record<string, unknown>;
-    
+
     // Check for results field
     if ('results' in dataObj && Array.isArray(dataObj.results)) {
       return dataObj.results as Category[];
     }
-    
+
     // Check for data field
     if ('data' in dataObj && Array.isArray(dataObj.data)) {
       return dataObj.data as Category[];
     }
-    
+
     // Check for count and results fields (DRF pagination)
     if ('count' in dataObj && 'results' in dataObj && Array.isArray(dataObj.results)) {
       return dataObj.results as Category[];

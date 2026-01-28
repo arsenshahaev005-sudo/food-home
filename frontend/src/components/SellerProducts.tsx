@@ -268,7 +268,7 @@ export default function SellerProducts({ token, profile }: SellerProductsProps) 
     // 1. Load Categories
     try {
       // getCategories теперь сама проверяет валидность токена
-      const catsData = await getCategories(token);
+      const catsData = await getCategories({}, token);
       
       // Process categories
       if (!Array.isArray(catsData) || catsData.length === 0) {
