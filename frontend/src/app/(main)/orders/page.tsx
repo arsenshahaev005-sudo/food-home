@@ -286,7 +286,7 @@ export default function OrdersPage() {
           prev.map(o => (o.id === order.id ? { ...o, review: updated as any } : o))
         );
       }
-    } catch (e) {
+    } catch {
       alert("Не удалось сохранить отзыв");
     } finally {
       setReviewSubmitting(null);
@@ -304,7 +304,7 @@ export default function OrdersPage() {
             : o
         )
       );
-    } catch (e) {
+    } catch {
       alert("Не удалось принять предложение возврата");
     }
   };
@@ -390,7 +390,8 @@ export default function OrdersPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4">
           {filteredOrders.map((order) => {
-            const status = getStatusInfo(order.status, false);
+            const isGift = Boolean((order as any).is_gift);
+            const status = getStatusInfo(order.status, isGift);
             const isExpanded = expandedOrder === order.id;
             const baseReview = (order as any).review as Review | undefined;
             const currentDraft =
@@ -474,6 +475,11 @@ export default function OrdersPage() {
                           <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${status.bg} ${status.color}`}>
                             {status.label}
                           </span>
+                          {giftSubstatus && (
+                            <p className="text-[10px] text-orange-500 font-medium max-w-[220px] text-right">
+                              {giftSubstatus}
+                            </p>
+                          )}
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] text-gray-400 font-black">#{order.id.slice(0, 8)}</span>
                             <svg 
@@ -561,9 +567,8 @@ export default function OrdersPage() {
                                   
                                   if (confirm(`Вы уверены, что хотите повторить заказ "${order.dish.name}"?`)) {
                                     try {
-                                      const newOrder = await reorderOrder(order.id, token);
+                                      await reorderOrder(order.id, token);
                                       alert('Заказ успешно повторен!');
-                                      // Refresh orders list
                                       fetchOrders(token, true);
                                     } catch (error) {
                                       console.error('Error reordering:', error);

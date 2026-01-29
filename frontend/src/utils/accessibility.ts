@@ -239,35 +239,35 @@ export const sanitizeHTML = (html: string): string => {
   return tempDiv.innerHTML;
 };
 
-/**
- * Debounce function for performance
- */
-export const debounce = <T extends (...args: unknown[]) => unknown>(
-  func: T,
+export const debounce = (
+  // eslint-disable-next-line no-unused-vars -- parameter name required in function type annotation
+  func: (..._args: unknown[]) => unknown,
   wait: number
-): ((...args: Parameters<T>) => void) => {
+  // eslint-disable-next-line no-unused-vars -- parameter name required in function type annotation
+): ((..._args: unknown[]) => void) => {
   let timeout: ReturnType<typeof setTimeout> | null = null;
 
-  return (...args: Parameters<T>) => {
+  return (...args: unknown[]) => {
     if (timeout) clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
 };
 
-/**
- * Throttle function for performance
- */
-export const throttle = <T extends (...args: unknown[]) => unknown>(
-  func: T,
+export const throttle = (
+  // eslint-disable-next-line no-unused-vars -- parameter name required in function type annotation
+  func: (..._args: unknown[]) => unknown,
   limit: number
-): ((...args: Parameters<T>) => void) => {
-  let inThrottle: boolean;
+  // eslint-disable-next-line no-unused-vars -- parameter name required in function type annotation
+): ((..._args: unknown[]) => void) => {
+  let inThrottle = false;
 
-  return (...args: Parameters<T>) => {
+  return (...args: unknown[]) => {
     if (!inThrottle) {
       func(...args);
       inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
+      setTimeout(() => {
+        inThrottle = false;
+      }, limit);
     }
   };
 };
@@ -316,13 +316,18 @@ export const getScrollPosition = (): { x: number; y: number } => {
   };
 };
 
+type ScrollIntoViewOptionsLike = {
+  behavior?: 'auto' | 'smooth';
+  block?: 'start' | 'center' | 'end' | 'nearest';
+  inline?: 'start' | 'center' | 'end' | 'nearest';
+};
+
 /**
  * Scroll to an element smoothly
  */
- 
 export const scrollToElement = (
   element: HTMLElement,
-  options: any = { behavior: 'smooth', block: 'start' }
+  options: ScrollIntoViewOptionsLike = { behavior: 'smooth', block: 'start' }
 ): void => {
   element.scrollIntoView(options);
 };

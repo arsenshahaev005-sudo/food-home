@@ -14,6 +14,7 @@ import "react-phone-number-input/style.css";
 
 interface SellerProfileProps {
   profile: Profile;
+  // eslint-disable-next-line no-unused-vars -- callback parameter name is for documentation only
   onProfileUpdated?: (profile: Profile) => void;
 }
 
@@ -190,15 +191,20 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
   const [pickupSaving, setPickupSaving] = useState(false);
 
   // Requisites and Employees States
-    const [requisitesForm, setRequisitesForm] = useState<any>((initialProfile as any).requisites || {
-          legal_status: '',
-      });
-    const [employeesForm, setEmployeesForm] = useState<any[]>((initialProfile as any).employees || []);
-    const [documentsForm, setDocumentsForm] = useState<any[]>((initialProfile as any).documents || []);
-    const [requisitesSaving, setRequisitesSaving] = useState(false);
-    const [employeesSaving, setEmployeesSaving] = useState(false);
-    const [documentsSaving, setDocumentsSaving] = useState(false);
-    const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
+  const [requisitesForm, setRequisitesForm] = useState<any>(
+    (initialProfile as any).requisites || {
+      legal_status: ''
+    }
+  );
+  const [employeesForm, setEmployeesForm] = useState<any[]>(
+    (initialProfile as any).employees || []
+  );
+  const [documentsForm, setDocumentsForm] = useState<any[]>(
+    (initialProfile as any).documents || []
+  );
+  const [requisitesSaving, setRequisitesSaving] = useState(false);
+  const [employeesSaving, setEmployeesSaving] = useState(false);
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null);
 
   // Contacts / Security States
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -215,26 +221,21 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
   const [editStep, setEditStep] = useState<'INPUT' | 'VERIFY'>('INPUT');
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Animation states
-  const [isEmailChangeHovered, setIsEmailChangeHovered] = useState(false);
-  const [isPhoneChangeHovered, setIsPhoneChangeHovered] = useState(false);
-  const [isPasswordChangeHovered, setIsPasswordChangeHovered] = useState(false);
-  const [isNameChangeHovered, setIsNameChangeHovered] = useState(false);
-  const [isSaveHovered, setIsSaveHovered] = useState(false);
-  const [is2FAHovered, setIs2FAHovered] = useState(false);
-  const [isDevicesHovered, setIsDevicesHovered] = useState(false);
-  const [hoveredAboutSection, setHoveredAboutSection] = useState<AboutSection | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [logoUploading, setLogoUploading] = useState(false);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setInterval> | null = null;
     if (resendCooldown > 0) {
       timer = setInterval(() => {
         setResendCooldown((prev) => prev - 1);
       }, 1000);
     }
-    return () => clearInterval(timer);
+    return () => {
+      if (timer !== null) {
+        clearInterval(timer);
+      }
+    };
   }, [resendCooldown]);
 
   useEffect(() => {

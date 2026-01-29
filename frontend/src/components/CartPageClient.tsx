@@ -38,9 +38,11 @@ export default function CartPageClient() {
   useEffect(() => {
     let active = true;
 
-    async function loadCartData() {
+    async function loadCartData(withSpinner: boolean = false) {
       try {
-        setLoading(true);
+        if (withSpinner) {
+          setLoading(true);
+        }
         setError(null);
 
         const token = readCookie("accessToken");
@@ -49,7 +51,9 @@ export default function CartPageClient() {
           if (active) {
             setCart(null);
             setProfile(null);
-            setLoading(false);
+            if (withSpinner) {
+              setLoading(false);
+            }
           }
           return;
         }
@@ -59,21 +63,25 @@ export default function CartPageClient() {
         if (active) {
           setCart(c);
           setProfile(p);
-          setLoading(false);
+          if (withSpinner) {
+            setLoading(false);
+          }
         }
       } catch (err) {
         console.error('[CartPageClient] Failed to load cart:', err);
         if (active) {
           setError("Не удалось загрузить корзину");
           setCart(null);
-          setLoading(false);
+          if (withSpinner) {
+            setLoading(false);
+          }
         }
       }
     }
 
-    loadCartData();
+    loadCartData(true);
 
-    const onCartChanged = () => void loadCartData();
+    const onCartChanged = () => void loadCartData(false);
     window.addEventListener("cart_changed", onCartChanged);
 
     return () => {

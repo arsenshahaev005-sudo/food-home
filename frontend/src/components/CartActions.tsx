@@ -185,7 +185,6 @@ export function RemoveItemButton({ dish, token }: { dish: UUID; token?: string }
     try {
       await cartRemove(dish, getToken(token));
       window.dispatchEvent(new Event("cart_changed"));
-      router.refresh();
     } catch {}
   }
   return (
@@ -207,7 +206,6 @@ export function ClearCartButton({ token }: { token?: string }) {
         })
       );
       window.dispatchEvent(new Event("cart_changed"));
-      router.refresh();
     } catch {}
   }
   return (
@@ -236,6 +234,7 @@ export function CartItemControls({
   const [loading, setLoading] = useState(false);
   const effectiveToken = getToken(token);
   const effectiveMax = maxQuantity && maxQuantity > 0 ? Math.max(maxQuantity, minQuantity) : null;
+  const deselectedStorageKey = CART_DESELECTED_STORAGE_KEY;
 
   const rebuild = async (nextItems: Array<{ dish: UUID; quantity: number; selected_toppings?: any[] }>) => {
     await cartClear(effectiveToken);
@@ -245,17 +244,29 @@ export function CartItemControls({
       }
     }
     pruneDeselectedToCart(
-      CART_DESELECTED_STORAGE_KEY,
-      nextItems.map((x) => buildCartItemKey(String(x.dish), x.selected_toppings))
+      deselectedStorageKey,
+      nextItems
+        .filter((it) => it.quantity > 0)
+        .map((x) => buildCartItemKey(String(x.dish), x.selected_toppings))
     );
     window.dispatchEvent(new Event("cart_changed"));
   };
 
   const areToppingsEqual = (a: any[] = [], b: any[] = []) => {
     if (a.length !== b.length) return false;
-    // Simple check: names and prices match
-    const sortedA = [...a].sort((x, y) => x.name.localeCompare(y.name));
-    const sortedB = [...b].sort((x, y) => x.name.localeCompare(y.name));
+    const normalize = (arr: any[]) =>
+      [...arr]
+        .map((t) => ({
+          name: String(t?.name ?? ""),
+          price: Number(t?.price ?? 0),
+        }))
+        .sort((x, y) => {
+          const byName = x.name.localeCompare(y.name);
+          if (byName !== 0) return byName;
+          return x.price - y.price;
+        });
+    const sortedA = normalize(a);
+    const sortedB = normalize(b);
     return sortedA.every((val, index) => val.name === sortedB[index].name && val.price === sortedB[index].price);
   };
 
@@ -263,28 +274,30 @@ export function CartItemControls({
     const withMin = Math.max(minQuantity, nextQuantity);
     const clamped = effectiveMax ? Math.min(effectiveMax, withMin) : withMin;
     const nextItems = items.map((it) =>
-      (it.dish === dish && areToppingsEqual(it.selected_toppings, selectedToppings))
+      it.dish === dish && areToppingsEqual(it.selected_toppings, selectedToppings)
         ? { ...it, quantity: clamped }
         : it
     );
     setLoading(true);
     try {
       await rebuild(nextItems);
-      router.refresh();
-    } catch {} finally {
+    } catch {
+    } finally {
       setLoading(false);
     }
   };
 
   const remove = async () => {
-    const nextItems = items.filter((it) =>
-      !(it.dish === dish && areToppingsEqual(it.selected_toppings, selectedToppings))
+    const nextItems = items.map((it) =>
+      it.dish === dish && areToppingsEqual(it.selected_toppings, selectedToppings)
+        ? { ...it, quantity: 0 }
+        : it
     );
     setLoading(true);
     try {
       await rebuild(nextItems);
-      router.refresh();
-    } catch {} finally {
+    } catch {
+    } finally {
       setLoading(false);
     }
   };
@@ -403,7 +416,6 @@ export function AddToCartButton({
     try {
       await cartAdd(dish, currentQuantity, effectiveToken, selectedToppings);
       window.dispatchEvent(new Event("cart_changed"));
-      router.refresh();
       flash("success");
     } catch {
       flash("error");

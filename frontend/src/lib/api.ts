@@ -202,6 +202,172 @@ export const apiDelete = async <T>(url: string, token: string): Promise<T> => {
   return response.json();
 };
 
+// ============ Orders high-level API functions ============
+
+export interface OrderEstimate {
+  delivery_price: number;
+  total_price: number;
+  discount_amount?: number;
+  estimated_cooking_time: number;
+}
+
+interface OrderPaymentInitLegacyResponse {
+  Success: boolean;
+  PaymentId?: string;
+  Message?: string;
+  [key: string]: unknown;
+}
+
+interface OrderSbpQrResponse {
+  Success: boolean;
+  Data?: string;
+  Message?: string;
+  [key: string]: unknown;
+}
+
+export const createOrder = async (data: any, token?: string): Promise<Order> => {
+  if (!token || token.trim().length === 0) {
+    console.error('createOrder: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/orders/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+export const payOrder = async (
+  orderId: string,
+  token?: string,
+): Promise<{ detail: string; status: string }> => {
+  if (!token || token.trim().length === 0) {
+    console.error('payOrder: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      orderId,
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/pay/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+export const initOrderPayment = async (
+  orderId: string,
+  token?: string,
+): Promise<OrderPaymentInitLegacyResponse> => {
+  if (!token || token.trim().length === 0) {
+    console.error('initOrderPayment: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      orderId,
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/init_payment/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  const data = await response.json();
+
+  return {
+    Success: true,
+    PaymentId: data.payment_id as string | undefined,
+    Message: null,
+    ...data,
+  };
+};
+
+export const getOrderSbpQr = async (
+  orderId: string,
+  token?: string,
+): Promise<OrderSbpQrResponse> => {
+  if (!token || token.trim().length === 0) {
+    console.error('getOrderSbpQr: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      orderId,
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/get_sbp_qr/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+export const reorderOrder = async (orderId: string, token: string): Promise<Order> => {
+  const reorderResponse = await apiPostAuth<{
+    success?: boolean;
+    data?: { order_id?: string };
+    order_id?: string;
+  }>('/api/orders/reorder/', token, {
+    order_id: orderId,
+  });
+
+  const newOrderId =
+    reorderResponse.data?.order_id || (reorderResponse.order_id as string | undefined);
+
+  if (!newOrderId) {
+    throw new Error('Не удалось определить идентификатор нового заказа');
+  }
+
+  const order = await apiGetAuth<Order>(`/api/v1/orders/${newOrderId}/`, token);
+  return order;
+};
+
 export const api = {
   // Orders API
   orders: {
@@ -503,20 +669,6 @@ export interface Producer {
   weekly_schedule?: any;
 }
 
-export interface OrderEstimateItem {
-  dish_id: string;
-  quantity: number;
-  selected_toppings?: any[];
-}
-
-export interface OrderEstimate {
-  subtotal: number;
-  delivery_price: number;
-  total: number;
-  estimated_delivery_time: string;
-  cooking_time_minutes: number;
-}
-
 export interface DishFilters {
   category?: string;
   producer?: string;
@@ -638,22 +790,42 @@ export const getProducerById = async (id: string): Promise<Producer> => {
 };
 
 /**
- * Оценить стоимость заказа
+ * Оценить стоимость заказа для одного блюда
  */
-export const estimateOrder = async (items: OrderEstimateItem[]): Promise<OrderEstimate> => {
+export const estimateOrder = async (
+  data: {
+    dish: string;
+    quantity: number;
+    delivery_latitude?: number;
+    delivery_longitude?: number;
+    delivery_type?: 'BUILDING' | 'DOOR';
+    promo_code_text?: string;
+  },
+  token?: string,
+): Promise<OrderEstimate> => {
+  if (!token || token.trim().length === 0) {
+    console.error('estimateOrder: invalid token provided', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      dish: data.dish,
+    });
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+
   const response = await fetch(`${API_BASE_URL}/api/orders/estimate/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify(data),
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw error;
   }
-  
+
   return response.json();
 };
 

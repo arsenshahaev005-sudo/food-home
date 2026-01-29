@@ -104,7 +104,7 @@ export async function removeFromCart(
   selectedToppings?: any[]
 ): Promise<void> {
   await apiPost<void>('/api/cart/remove/', {
-    dish_id: dishId,
+    dish: dishId,
     selected_toppings: selectedToppings || []
   }, token);
 }
@@ -113,7 +113,7 @@ export async function removeFromCart(
  * Очистить корзину
  */
 export async function clearCart(token: string): Promise<void> {
-  await apiDelete('/api/cart/clear/', token);
+  await apiPost('/api/cart/clear/', {}, token);
 }
 
 /**

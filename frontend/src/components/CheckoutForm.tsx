@@ -172,6 +172,8 @@ export default function CheckoutForm({
   const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState<string>("");
+  const [senderName, setSenderName] = useState("");
+  const [senderPhone, setSenderPhone] = useState<string>("");
   const [coords, setCoords] = useState<Coords | null>(null);
   const [initialCoords, setInitialCoords] = useState<Coords | undefined>(undefined);
   const [addressQuery, setAddressQuery] = useState("");
@@ -191,11 +193,16 @@ export default function CheckoutForm({
   const [acceptOffer, setAcceptOffer] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [acceptReceipts, setAcceptReceipts] = useState(false);
+  const [showGiftMenu, setShowGiftMenu] = useState(false);
   const [useAlternativeAddress, setUseAlternativeAddress] = useState(false);
   const [askRecipientAddress, setAskRecipientAddress] = useState(false);
+  const [isAnonymousGift, setIsAnonymousGift] = useState(false);
   const [deliveryEstimate, setDeliveryEstimate] = useState<{ delivery_price: number; total_price: number; estimated_cooking_time: number } | null>(null);
   const [deliveryEstimateLoading, setDeliveryEstimateLoading] = useState(false);
   const [deliveryEstimateError, setDeliveryEstimateError] = useState<string | null>(null);
+
+  const isGiftOrder = useAlternativeAddress || askRecipientAddress;
+  const isDirectGift = useAlternativeAddress && !askRecipientAddress;
 
   useEffect(() => {
     try {
@@ -244,6 +251,11 @@ export default function CheckoutForm({
 
   useEffect(() => {
     if (!token) {
+      setDeliveryEstimate(null);
+      setDeliveryEstimateError(null);
+      return;
+    }
+    if (askRecipientAddress) {
       setDeliveryEstimate(null);
       setDeliveryEstimateError(null);
       return;
@@ -321,7 +333,7 @@ export default function CheckoutForm({
     return () => {
       cancelled = true;
     };
-  }, [token, coords, deliveryType, isUrgent, promoCode, items, deselectedDishIds]);
+  }, [token, coords, deliveryType, isUrgent, promoCode, items, deselectedDishIds, askRecipientAddress]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -390,10 +402,22 @@ export default function CheckoutForm({
 
   async function submit() {
     if (!token) { setStatus("Нужна авторизация"); return; }
-    if (!addressQuery.trim()) { setStatus("Введите адрес доставки"); return; }
-    if (!coords) { setStatus("Отметьте адрес на карте"); return; }
-    if (!name.trim() || !phone) { setStatus("Введите имя и телефон"); return; }
-    if (deliveryType === "DOOR") {
+    if (!addressQuery.trim() && !askRecipientAddress) { setStatus("Введите адрес доставки"); return; }
+    if (!coords && !askRecipientAddress) { setStatus("Отметьте адрес на карте"); return; }
+    if (!isGiftOrder) {
+      if (!name.trim() || !phone) { setStatus("Введите имя и телефон"); return; }
+    } else if (askRecipientAddress) {
+      if (!name.trim() || !phone || !senderName.trim() || !senderPhone) {
+        setStatus("Укажите данные получателя и отправителя");
+        return;
+      }
+    } else {
+      if (!name.trim() || !phone) {
+        setStatus("Укажите имя и телефон получателя");
+        return;
+      }
+    }
+    if (deliveryType === "DOOR" && !askRecipientAddress) {
       if (!apartment.trim()) { setStatus("Укажите квартиру"); return; }
       if (!floor.trim()) { setStatus("Укажите этаж"); return; }
       if (!intercom.trim()) { setStatus("Укажите домофон"); return; }
@@ -405,9 +429,13 @@ export default function CheckoutForm({
     try {
       const doneOrders: CheckoutDoneOrder[] = [];
       for (const it of selectedItems) {
+        const contactName =
+          !isGiftOrder ? name.trim() : askRecipientAddress ? senderName.trim() : name.trim();
+        const contactPhone =
+          !isGiftOrder ? phone : askRecipientAddress ? senderPhone : phone;
         const body: any = {
-          user_name: name.trim(),
-          phone,
+          user_name: contactName,
+          phone: contactPhone,
           dish: it.dish,
           quantity: it.quantity,
           delivery_type: deliveryType,
@@ -420,11 +448,17 @@ export default function CheckoutForm({
           intercom: deliveryType === "DOOR" ? intercom.trim() : undefined,
           delivery_comment: deliveryComment.trim(),
         };
-        if (coords) {
+        if (isGiftOrder) {
+          body.is_gift = true;
+          body.is_anonymous = isAnonymousGift;
+          body.recipient_phone = phone;
+          body.recipient_name = name.trim();
+        }
+        if (coords && !askRecipientAddress) {
           body.delivery_latitude = coords.lat;
           body.delivery_longitude = coords.lon;
         }
-        if (addressQuery.trim()) {
+        if (addressQuery.trim() && !askRecipientAddress) {
           body.delivery_address_text = addressQuery;
         }
         const created = await createOrder(body, token);
@@ -561,69 +595,171 @@ export default function CheckoutForm({
       </div>
 
       <div className="space-y-3">
-        <div className="space-y-2">
-          <label className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useAlternativeAddress}
-              onChange={(e) => {
-                setUseAlternativeAddress(e.target.checked);
-                if (e.target.checked) {
-                  setAskRecipientAddress(false);
-                }
-              }}
-              className="mt-1 h-4 w-4 rounded border-gray-300"
-              style={{ accentColor: "#c9825b" }}
-            />
+        <button
+          type="button"
+          onClick={() => {
+            const next = !showGiftMenu;
+            setShowGiftMenu(next);
+            if (!next) {
+              setUseAlternativeAddress(false);
+              setAskRecipientAddress(false);
+              setIsAnonymousGift(false);
+            } else {
+              setUseAlternativeAddress(true);
+              setAskRecipientAddress(false);
+            }
+          }}
+          className="flex w-full items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-colors hover:bg-gray-100"
+        >
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl bg-[#c9825b]/10 text-sm font-black text-[#c9825b]">
+              🎁
+            </span>
             <div className="min-w-0">
               <div className="font-black text-sm text-gray-900">Отправить на другой адрес</div>
               <div className="text-xs" style={{ color: "#7c6b62" }}>
-                Укажите адрес получателя, отличный от адреса доставки
+                {showGiftMenu ? "Выберите, как указать данные получателя" : "Оформить заказ как подарок"}
               </div>
             </div>
-          </label>
-
-          <label className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={askRecipientAddress}
-              onChange={(e) => {
-                setAskRecipientAddress(e.target.checked);
-                if (e.target.checked) {
-                  setUseAlternativeAddress(false);
-                }
-              }}
-              className="mt-1 h-4 w-4 rounded border-gray-300"
-              style={{ accentColor: "#c9825b" }}
-            />
-            <div className="min-w-0">
-              <div className="font-black text-sm text-gray-900">Узнать адрес у получателя</div>
-              <div className="text-xs" style={{ color: "#7c6b62" }}>
-                Продавец свяжется с получателем для уточнения адреса
-              </div>
-            </div>
-          </label>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Имя получателя"
-            className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
-            autoComplete="name"
-          />
-          <div className="rounded-2xl border border-gray-100 bg-gray-50 focus-within:ring-2 focus-within:ring-[#c9825b]/20 focus-within:border-[#c9825b] transition-all overflow-hidden px-5 py-[11px]">
-            <PhoneInput
-              international
-              defaultCountry="RU"
-              value={phone}
-              onChange={(val) => setPhone(val || "")}
-              className="phone-input-custom w-full bg-transparent"
-              placeholder="Телефон"
-            />
           </div>
-        </div>
+          <span className="ml-3 inline-flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-400">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className={`transition-transform ${showGiftMenu ? "rotate-180" : ""}`}
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </span>
+        </button>
+
+        {showGiftMenu && (
+          <div className="space-y-3 rounded-2xl border border-gray-100 bg-white px-4 py-3">
+            <div className="space-y-2">
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={askRecipientAddress}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setAskRecipientAddress(next);
+                    if (next) {
+                      setUseAlternativeAddress(false);
+                    } else {
+                      setUseAlternativeAddress(true);
+                    }
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-gray-300"
+                  style={{ accentColor: "#c9825b" }}
+                />
+                <div className="min-w-0">
+                  <div className="font-black text-sm text-gray-900">Узнать адрес у получателя</div>
+                  <div className="text-xs" style={{ color: "#7c6b62" }}>
+                    Продавец свяжется с получателем для уточнения адреса
+                  </div>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isAnonymousGift}
+                  onChange={(e) => setIsAnonymousGift(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-gray-300"
+                  style={{ accentColor: "#c9825b" }}
+                />
+                <div className="min-w-0">
+                  <div className="font-black text-sm text-gray-900">Сделать подарок анонимным</div>
+                  <div className="text-xs" style={{ color: "#7c6b62" }}>
+                    Получатель не увидит ваше имя в уведомлении
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {isDirectGift && (
+              <div className="px-1">
+                <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">
+                  Данные получателя
+                </div>
+                <p className="text-xs text-gray-500">
+                  Укажите имя, номер телефона и адрес получателя, чтобы курьер точно доставил подарок.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isGiftOrder && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ваше имя"
+              className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
+              autoComplete="name"
+            />
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 focus-within:ring-2 focus-within:ring-[#c9825b]/20 focus-within:border-[#c9825b] transition-all overflow-hidden px-5 py-[11px]">
+              <PhoneInput
+                international
+                defaultCountry="RU"
+                value={phone}
+                onChange={(val) => setPhone(val || "")}
+                className="phone-input-custom w-full bg-transparent"
+                placeholder="Ваш телефон"
+              />
+            </div>
+          </div>
+        )}
+
+        {isGiftOrder && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Имя получателя"
+                className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
+                autoComplete="name"
+              />
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 focus-within:ring-2 focus-within:ring-[#c9825b]/20 focus-within:border-[#c9825b] transition-all overflow-hidden px-5 py-[11px]">
+                <PhoneInput
+                  international
+                  defaultCountry="RU"
+                  value={phone}
+                  onChange={(val) => setPhone(val || "")}
+                  className="phone-input-custom w-full bg-transparent"
+                  placeholder="Телефон получателя"
+                />
+              </div>
+            </div>
+            {askRecipientAddress && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input
+                  value={senderName}
+                  onChange={(e) => setSenderName(e.target.value)}
+                  placeholder="Имя отправителя"
+                  className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
+                  autoComplete="name"
+                />
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 focus-within:ring-2 focus-within:ring-[#c9825b]/20 focus-within:border-[#c9825b] transition-all overflow-hidden px-5 py-[11px]">
+                  <PhoneInput
+                    international
+                    defaultCountry="RU"
+                    value={senderPhone}
+                    onChange={(val) => setSenderPhone(val || "")}
+                    className="phone-input-custom w-full bg-transparent"
+                    placeholder="Телефон отправителя"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
 
         <div className="flex gap-2 items-center">
@@ -631,47 +767,60 @@ export default function CheckoutForm({
             className="flex-1 px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium min-w-0"
             style={{ color: "#4b2f23" }}
           >
-            {addressQuery || "Адрес доставки не выбран. Выберите адрес в шапке сайта."}
+            {askRecipientAddress
+              ? "Узнаем адрес у получателя"
+              : addressQuery ||
+                (isDirectGift
+                  ? "Адрес получателя не выбран. Выберите адрес в шапке сайта."
+                  : "Адрес доставки не выбран. Выберите адрес в шапке сайта.")}
           </div>
         </div>
 
         <div className="space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <input
-                value={entrance}
-                onChange={(e) => setEntrance(e.target.value)}
-                placeholder="Подъезд"
-                className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
+          {!askRecipientAddress ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <input
+                  value={entrance}
+                  onChange={(e) => setEntrance(e.target.value)}
+                  placeholder="Подъезд"
+                  className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
+                />
+                {deliveryType === "DOOR" && (
+                  <>
+                    <input
+                      value={apartment}
+                      onChange={(e) => setApartment(e.target.value)}
+                      placeholder="Кв/офис"
+                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
+                    />
+                    <input
+                      value={floor}
+                      onChange={(e) => setFloor(e.target.value)}
+                      placeholder="Этаж"
+                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
+                    />
+                    <input
+                      value={intercom}
+                      onChange={(e) => setIntercom(e.target.value)}
+                      placeholder="Домофон"
+                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
+                    />
+                  </>
+                )}
+              </div>
+              <textarea
+                value={deliveryComment}
+                onChange={(e) => setDeliveryComment(e.target.value)}
+                placeholder="Комментарий для курьера"
+                className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium resize-none h-24"
               />
-              {deliveryType === "DOOR" && (
-                <>
-                  <input
-                    value={apartment}
-                    onChange={(e) => setApartment(e.target.value)}
-                    placeholder="Кв/офис"
-                    className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
-                  />
-                  <input
-                    value={floor}
-                    onChange={(e) => setFloor(e.target.value)}
-                    placeholder="Этаж"
-                    className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
-                  />
-                  <input
-                    value={intercom}
-                    onChange={(e) => setIntercom(e.target.value)}
-                    placeholder="Домофон"
-                    className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium"
-                  />
-                </>
-              )}
+            </>
+          ) : (
+            <div className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium" style={{ color: "#4b2f23" }}>
+              Уточним подъезд, этаж, домофон и комментарий у получателя
             </div>
-          <textarea
-            value={deliveryComment}
-            onChange={(e) => setDeliveryComment(e.target.value)}
-            placeholder="Комментарий для курьера"
-            className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#c9825b]/20 focus:border-[#c9825b] outline-none transition-all font-medium resize-none h-24"
-          />
+          )}
         </div>
       </div>
 
