@@ -223,7 +223,7 @@ export default function CartPageClient() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-24 lg:pb-32">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-4xl font-black text-gray-900 leading-tight">Корзина</h1>
@@ -327,7 +327,7 @@ export default function CartPageClient() {
           </div>
         )}
 
-        <aside className={itemsWithDish.length > 0 ? "space-y-4 lg:sticky lg:top-8" : "hidden"}>
+        <aside className={itemsWithDish.length > 0 ? "space-y-4 lg:sticky lg:top-24" : "hidden"}>
           <CartTotals items={cartItemsWithPrice} />
           <div className="bg-card rounded-[32px] p-6 space-y-4">
             <CheckoutModal
