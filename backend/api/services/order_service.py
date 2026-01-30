@@ -450,7 +450,7 @@ class OrderService:
         return order
 
     @transaction.atomic
-    def reject_order(self, order: Order, producer: Producer, reason: str) -> Order:
+    def reject_order(self, order: Order, producer: Producer, reason: str, apply_penalty: bool = True) -> Order:
         """
         Отклоняет заказ продавцом.
 
@@ -458,6 +458,7 @@ class OrderService:
             order: Заказ
             producer: Магазин (Producer)
             reason: Причина отклонения
+            apply_penalty: Применять ли штраф (по умолчанию True, всегда применяется)
 
         Returns:
             Order: Обновленный заказ
@@ -480,13 +481,14 @@ class OrderService:
 
         # Изменяем статус на CANCELLED_BY_SELLER
         order.status = "CANCELLED"
-        order.cancelled_by = "SELLER"
+        order.cancelled_by = "SELLER"  # Всегда SELLER (включая автоотмену по таймауту)
         order.cancelled_reason = reason
         order.cancelled_at = timezone.now()
 
-        # Применяем штраф через penalty_service
-        penalty_service = PenaltyService()
-        penalty_service.apply_order_rejection_penalty(producer, order)
+        # Применяем штраф (по умолчанию всегда, включая автоотмену)
+        if apply_penalty:
+            penalty_service = PenaltyService()
+            penalty_service.apply_order_rejection_penalty(producer, order)
 
         order.save(update_fields=["status", "cancelled_by", "cancelled_reason", "cancelled_at"])
 

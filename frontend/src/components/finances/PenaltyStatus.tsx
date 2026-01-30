@@ -110,9 +110,12 @@ export default function PenaltyStatus({ producerId, token }: PenaltyStatusProps)
               <p className="text-white/90 mb-4">
                 Причина: {penaltyInfo.ban_reason || 'Превышен лимит отклоненных заказов'}
               </p>
-              <button className="px-6 py-3 bg-white text-red-600 rounded-lg font-bold hover:bg-red-50 transition-colors">
+              <a
+                href="mailto:support@food-home.com?subject=Запрос на разбан магазина&body=Здравствуйте! Мой магазин был заблокирован. ID магазина: {producerId}. Прошу рассмотреть возможность разблокировки."
+                className="inline-block px-6 py-3 bg-white text-red-600 rounded-lg font-bold hover:bg-red-50 transition-colors"
+              >
                 Связаться с поддержкой
-              </button>
+              </a>
             </div>
           </div>
         </div>

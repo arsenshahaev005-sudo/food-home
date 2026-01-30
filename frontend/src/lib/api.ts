@@ -211,6 +211,19 @@ export interface OrderEstimate {
   estimated_cooking_time: number;
 }
 
+export interface TimeSlot {
+  time: string;        // ISO datetime string
+  display: string;     // "14:00"
+  available: boolean;
+  reason?: string;     // Why unavailable
+  remaining_capacity?: number;  // If limit is set
+}
+
+export interface AvailableSlotsResponse {
+  date: string;
+  slots: TimeSlot[];
+}
+
 interface OrderPaymentInitLegacyResponse {
   Success: boolean;
   PaymentId?: string;
@@ -280,6 +293,31 @@ export const payOrder = async (
 
   return response.json();
 };
+
+export async function getAvailableTimeSlots(
+  dishId: string,
+  date: string,  // YYYY-MM-DD
+  quantity: number,
+  token?: string
+): Promise<AvailableSlotsResponse> {
+  const url = `${API_BASE_URL}/api/orders/available-slots/?dish=${dishId}&date=${date}&quantity=${quantity}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, { headers });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw error;
+  }
+
+  return res.json();
+}
 
 export const initOrderPayment = async (
   orderId: string,

@@ -84,6 +84,10 @@ class Producer(models.Model):
         max_digits=10, decimal_places=2, default=0.0
     )
     delivery_time_minutes = models.PositiveIntegerField(default=60)
+    max_orders_per_slot = models.PositiveIntegerField(
+        default=0,
+        help_text="Maximum number of scheduled orders per time slot (0 = unlimited)"
+    )
     # JSON list of rules: [{"start": "18:00", "end": "21:00", "surcharge": 50.0}]
     delivery_pricing_rules = models.JSONField(
         default=list, blank=True, validators=[delivery_pricing_rules_validator]
@@ -434,6 +438,14 @@ class Order(models.Model):
     delivery_actual_arrival_at = models.DateTimeField(null=True, blank=True)
     delivery_late_minutes = models.PositiveIntegerField(default=0)
     delivery_penalty_applied = models.BooleanField(default=False)
+
+    # Scheduled delivery
+    scheduled_delivery_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Customer's requested delivery time. NULL = ASAP delivery"
+    )
 
     # Rescheduling logic
     reschedule_requested_by_seller = models.BooleanField(default=False)

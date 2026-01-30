@@ -1289,6 +1289,81 @@ class OrderViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=False, methods=["get"], url_path="available-slots")
+    def available_slots(self, request):
+        """
+        Get available delivery time slots for a specific dish and date.
+
+        GET /api/orders/available-slots/?dish={id}&date={YYYY-MM-DD}&quantity={n}
+
+        Returns:
+            {
+                "date": "2026-02-15",
+                "slots": [
+                    {
+                        "time": "2026-02-15T14:00:00Z",
+                        "display": "14:00",
+                        "available": true,
+                        "reason": null,
+                        "remaining_capacity": 3
+                    },
+                    ...
+                ]
+            }
+        """
+        from api.services.scheduling_service import SchedulingService
+        from datetime import datetime
+
+        # Parse query parameters
+        dish_id = request.query_params.get("dish")
+        date_str = request.query_params.get("date")
+        quantity_str = request.query_params.get("quantity", "1")
+
+        # Validate parameters
+        if not dish_id or not date_str:
+            return Response(
+                {"detail": "dish and date parameters are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            dish = Dish.objects.get(id=dish_id)
+        except Dish.DoesNotExist:
+            return Response(
+                {"detail": "Dish not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response(
+                {"detail": "Invalid date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            quantity = int(quantity_str)
+        except (ValueError, TypeError):
+            quantity = 1
+
+        if quantity < 1:
+            quantity = 1
+
+        # Get available slots
+        scheduling_service = SchedulingService()
+        slots = scheduling_service.get_available_time_slots(
+            producer=dish.producer,
+            dish=dish,
+            quantity=quantity,
+            target_date=target_date
+        )
+
+        return Response({
+            "date": date_str,
+            "slots": slots
+        })
+
     def perform_create(self, serializer):
         role = "CLIENT"
         if self.request.auth:
@@ -1462,6 +1537,50 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         delivery_address_text = self.request.data.get("delivery_address_text", "") or ""
 
+        # Handle scheduled delivery
+        scheduled_time_str = self.request.data.get("scheduled_delivery_time")
+        scheduled_delivery_time = None
+
+        if scheduled_time_str:
+            from api.services.scheduling_service import SchedulingService
+            from dateutil import parser
+
+            try:
+                # Parse ISO datetime string
+                scheduled_delivery_time = parser.isoparse(scheduled_time_str)
+
+                # Make timezone-aware if needed
+                if timezone.is_naive(scheduled_delivery_time):
+                    scheduled_delivery_time = timezone.make_aware(scheduled_delivery_time)
+
+                # Validate the scheduled time
+                scheduling_service = SchedulingService()
+                is_valid, error_msg = scheduling_service.validate_scheduled_time(
+                    producer=producer,
+                    dish=dish,
+                    quantity=quantity,
+                    scheduled_time=scheduled_delivery_time,
+                    delivery_time_minutes=zone_for_distance.get('time_minutes') if zone_for_distance else None
+                )
+
+                if not is_valid:
+                    raise serializers.ValidationError(
+                        {"scheduled_delivery_time": error_msg}
+                    )
+
+                # For scheduled orders, adjust acceptance deadline
+                # Seller must accept at least 2 hours before scheduled time
+                deadline_from_scheduled = scheduled_delivery_time - timedelta(hours=2)
+
+                # But also give seller at least 1 hour from now to respond
+                min_deadline = now + timedelta(hours=1)
+                deadline = max(deadline_from_scheduled, min_deadline)
+
+            except (ValueError, TypeError) as e:
+                raise serializers.ValidationError(
+                    {"scheduled_delivery_time": "Invalid datetime format"}
+                )
+
         serializer.save(
             producer=producer,
             user=self.request.user if self.request.user.is_authenticated else None,
@@ -1475,6 +1594,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             delivery_address_text=delivery_address_text,
             applied_promo_code=applied_promo,
             discount_amount=discount_amount,
+            scheduled_delivery_time=scheduled_delivery_time,
         )
 
     @action(detail=True, methods=["post"], url_path="start_delivery")

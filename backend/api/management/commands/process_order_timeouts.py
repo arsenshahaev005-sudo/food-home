@@ -2,7 +2,10 @@
 Management команда для автоматической обработки просроченных заказов.
 
 Находит все заказы в статусе WAITING_FOR_ACCEPTANCE с истёкшим acceptance_deadline
-и автоматически отклоняет их с применением штрафа.
+и автоматически отклоняет их С применением штрафа.
+
+Если продавец не успел принять заказ вовремя - это считается отказом,
+применяются те же санкции что и при ручной отмене (штраф, автоматический отзыв, consecutive_rejections).
 
 Запускать каждые 5 минут через cron:
 */5 * * * * python manage.py process_order_timeouts
@@ -81,12 +84,13 @@ class Command(BaseCommand):
                     processed_count += 1
                     continue
 
-                # Отклоняем заказ с причиной "Истекло время принятия"
+                # Отклоняем заказ С штрафом (автоотмена по таймауту = отказ продавца)
                 with transaction.atomic():
                     updated_order = order_service.reject_order(
                         order=order,
                         producer=order.producer,
-                        reason="Истекло время принятия заказа"
+                        reason="Истекло время принятия заказа",
+                        apply_penalty=True  # Применяем штраф - не успел принять = отказ
                     )
 
                 processed_count += 1
@@ -94,7 +98,7 @@ class Command(BaseCommand):
                 if verbose:
                     self.stdout.write(
                         self.style.SUCCESS(
-                            f"Заказ {order.id} отклонен. "
+                            f"Заказ {order.id} отклонен по таймауту. "
                             f"Штраф: {updated_order.penalty_amount} руб. "
                             f"consecutive_rejections: {order.producer.consecutive_rejections}"
                         )
@@ -112,9 +116,9 @@ class Command(BaseCommand):
                     )
                 )
 
-        # Проверяем, есть ли магазины с 3 и более отклонениями подряд
-        if not dry_run:
-            self._check_and_ban_producers(verbose)
+        # Проверяем забанированные магазины после обработки
+        if not dry_run and processed_count > 0:
+            self._check_banned_producers(verbose)
 
         # Выводим итоговую статистику
         self.stdout.write("\n" + "=" * 50)
@@ -125,12 +129,12 @@ class Command(BaseCommand):
             )
         )
 
-    def _check_and_ban_producers(self, verbose=False):
+    def _check_banned_producers(self, verbose=False):
         """
-        Проверяет магазины с 3 и более отклонениями подряд и выводит информацию.
+        Проверяет и выводит информацию о забанированных магазинах.
 
-        Примечание: Бан уже применяется автоматически в reject_order через
-        penalty_service.apply_order_rejection_penalty, поэтому здесь только логируем.
+        Бан применяется автоматически в penalty_service.apply_order_rejection_penalty,
+        здесь только выводим информацию для мониторинга.
         """
         banned_producers = Producer.objects.filter(
             is_banned=True,
@@ -143,13 +147,16 @@ class Command(BaseCommand):
         self.stdout.write("\n" + "=" * 50)
         self.stdout.write(
             self.style.WARNING(
-                f"Забанированные магазины (всего: {banned_producers.count()}):"
+                f"⚠️ Забанированные магазины (всего: {banned_producers.count()}):"
             )
         )
 
         for producer in banned_producers:
             self.stdout.write(
-                f"  - {producer.name} (ID: {producer.id}): "
-                f"{producer.consecutive_rejections} отклонений, "
-                f"причина: {producer.ban_reason}"
+                self.style.ERROR(
+                    f"  🚫 {producer.name} (ID: {producer.id}): "
+                    f"{producer.consecutive_rejections} отклонений подряд, "
+                    f"причина: {producer.ban_reason}"
+                )
             )
+

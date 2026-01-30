@@ -6,6 +6,7 @@ import "react-phone-number-input/style.css";
 import PhoneInput from "react-phone-number-input";
 import { cartClear, cartRemove, createOrder, payOrder, initOrderPayment, getOrderSbpQr, estimateOrder } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import ScheduledDeliveryPicker from "./ScheduledDeliveryPicker";
 
 type Item = { id: string; dish: string; quantity: number; price: number; selected_toppings?: any[] };
 type Coords = { lat: number; lon: number };
@@ -200,6 +201,7 @@ export default function CheckoutForm({
   const [deliveryEstimate, setDeliveryEstimate] = useState<{ delivery_price: number; total_price: number; estimated_cooking_time: number } | null>(null);
   const [deliveryEstimateLoading, setDeliveryEstimateLoading] = useState(false);
   const [deliveryEstimateError, setDeliveryEstimateError] = useState<string | null>(null);
+  const [scheduledDeliveryTime, setScheduledDeliveryTime] = useState<string | null>(null);
 
   const isGiftOrder = useAlternativeAddress || askRecipientAddress;
   const isDirectGift = useAlternativeAddress && !askRecipientAddress;
@@ -447,6 +449,7 @@ export default function CheckoutForm({
           floor: deliveryType === "DOOR" ? floor.trim() : undefined,
           intercom: deliveryType === "DOOR" ? intercom.trim() : undefined,
           delivery_comment: deliveryComment.trim(),
+          scheduled_delivery_time: scheduledDeliveryTime || undefined,
         };
         if (isGiftOrder) {
           body.is_gift = true;
@@ -854,8 +857,31 @@ export default function CheckoutForm({
         </div>
       )}
 
-      <div className="rounded-3xl border border-[#f0e2d6] bg-[#fff9f3] p-4 space-y-3">
-        <label className="flex items-start gap-3 rounded-2xl border border-[#f0e2d6] bg-white px-4 py-3">
+      {/* Scheduled Delivery Section */}
+      {selectedItems.length > 0 && selectedItems[0]?.dish && (
+        <div className="rounded-3xl border border-[#f0e2d6] bg-[#fff9f3] p-4 space-y-3">
+          <div className="text-sm font-black uppercase tracking-widest" style={{ color: "#7c6b62" }}>
+            Время доставки
+          </div>
+
+          <ScheduledDeliveryPicker
+            dishId={selectedItems[0].dish}
+            quantity={selectedItems[0].quantity || 1}
+            token={token}
+            onSelect={(datetime) => {
+              setScheduledDeliveryTime(datetime);
+            }}
+            onClear={() => {
+              setScheduledDeliveryTime(null);
+            }}
+            initialValue={scheduledDeliveryTime}
+          />
+        </div>
+      )}
+
+      {!scheduledDeliveryTime && (
+        <div className="rounded-3xl border border-[#f0e2d6] bg-[#fff9f3] p-4 space-y-3">
+          <label className="flex items-start gap-3 rounded-2xl border border-[#f0e2d6] bg-white px-4 py-3">
           <input
             type="checkbox"
             checked={isUrgent}
@@ -885,7 +911,8 @@ export default function CheckoutForm({
             Если оформляется несколько заказов, промокод применяется к одному из них.
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <label className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
@@ -958,7 +985,18 @@ export default function CheckoutForm({
               </span>
             </div>
             <div className="text-xs" style={{ color: "#7c6b62" }}>
-              Ориентировочное время доставки: {deliveryEstimate.estimated_cooking_time} мин
+              {scheduledDeliveryTime ? (
+                <>
+                  Запланированная доставка: {new Date(scheduledDeliveryTime).toLocaleString('ru-RU', {
+                    day: 'numeric',
+                    month: 'long',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </>
+              ) : (
+                <>Ориентировочное время доставки: {deliveryEstimate.estimated_cooking_time} мин</>
+              )}
             </div>
           </>
         )}

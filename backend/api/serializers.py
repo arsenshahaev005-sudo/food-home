@@ -340,6 +340,11 @@ class OrderSerializer(serializers.ModelSerializer):
     promo_code_text = serializers.CharField(
         write_only=True, required=False, allow_blank=True
     )
+    scheduled_delivery_time = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+        help_text="Requested delivery time. Leave empty for ASAP delivery."
+    )
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -453,6 +458,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "floor",
             "intercom",
             "delivery_comment",
+            "scheduled_delivery_time",
         ]
         read_only_fields = [
             "total_price",
@@ -551,6 +557,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     requisites = serializers.SerializerMethodField()
     employees = serializers.SerializerMethodField()
     documents = serializers.SerializerMethodField()
+    max_orders_per_slot = serializers.SerializerMethodField()
 
     class Meta:
         model = Profile
@@ -588,6 +595,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "requisites",
             "employees",
             "documents",
+            "max_orders_per_slot",
         ]
 
     def get_role(self, obj):
@@ -723,6 +731,11 @@ class ProfileSerializer(serializers.ModelSerializer):
     def get_documents(self, obj):
         if hasattr(obj.user, "producer"):
             return obj.user.producer.documents
+        return None
+
+    def get_max_orders_per_slot(self, obj):
+        if hasattr(obj.user, "producer"):
+            return obj.user.producer.max_orders_per_slot
         return None
 
 
