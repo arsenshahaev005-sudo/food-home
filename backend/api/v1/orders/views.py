@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 class OrderViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с заказами."""
 
+    queryset = Order.objects.all()
     permission_classes = [IsAuthenticated]
     order_service = OrderService()
 

@@ -840,15 +840,16 @@ export const getOrders = async (token: string): Promise<Order[]> => {
       'Authorization': `Bearer ${token}`,
     },
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw error;
   }
-  
+
   const data = await response.json();
-  // API returns { results: Order[] } format
-  return data.results || data;
+  // API v1 returns { success: true, data: Order[], pagination: {...} } format
+  // Legacy API returns { results: Order[] } format
+  return data.data || data.results || data;
 };
 
 // ============ Dish Management API functions ============

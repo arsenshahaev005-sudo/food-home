@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from api.models import Order
+from api.serializers import DishSerializer, ReviewSerializer, DisputeSerializer
 
 
 class OrderAcceptSerializer(serializers.Serializer):
@@ -47,24 +48,96 @@ class OrderCancelSerializer(serializers.Serializer):
 class OrderListSerializer(serializers.ModelSerializer):
     """Сериализатор для списка заказов."""
 
-    dish_name = serializers.CharField(source="dish.name", read_only=True)
-    producer_name = serializers.CharField(source="producer.name", read_only=True)
-    producer_id = serializers.UUIDField(source="producer.id", read_only=True)
+    status_display = serializers.SerializerMethodField()
+    status_step = serializers.SerializerMethodField()
+    status_max_step = serializers.SerializerMethodField()
+    disputes = DisputeSerializer(many=True, read_only=True)
+    review = ReviewSerializer(read_only=True)
+    tips_amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True
+    )
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        # Return full dish object for frontend compatibility
+        ret["dish"] = DishSerializer(instance.dish, context=self.context).data
+        return ret
+
+    def get_status_display(self, obj):
+        base = obj.get_status_display()
+        if obj.status == "CANCELLED" and getattr(obj, "cancelled_by", None):
+            mapping = {
+                "BUYER": "Отменён покупателем",
+                "SELLER": "Отменён продавцом",
+                "ADMIN": "Отменён администратором",
+                "SYSTEM": "Отменён системой",
+            }
+            return mapping.get(obj.cancelled_by, base)
+        return base
+
+    def get_status_step(self, obj):
+        mapping = {
+            "WAITING_FOR_PAYMENT": 1,
+            "WAITING_FOR_RECIPIENT": 2,
+            "WAITING_FOR_ACCEPTANCE": 2,
+            "COOKING": 3,
+            "READY_FOR_REVIEW": 4,
+            "READY_FOR_DELIVERY": 4,
+            "DELIVERING": 5,
+            "ARRIVED": 6,
+            "COMPLETED": 7,
+        }
+        return mapping.get(obj.status, 0)
+
+    def get_status_max_step(self, obj):
+        return 7
 
     class Meta:
         model = Order
         fields = [
             "id",
-            "dish_name",
-            "producer_name",
-            "producer_id",
+            "user_name",
+            "phone",
+            "dish",
             "quantity",
             "total_price",
-            "status",
             "created_at",
+            "delivery_latitude",
+            "delivery_longitude",
+            "delivery_address_text",
+            "status",
+            "status_display",
+            "status_step",
+            "status_max_step",
+            "is_urgent",
+            "acceptance_deadline",
             "estimated_cooking_time",
+            "finished_photo",
+            "disputes",
+            "review",
+            "tips_amount",
+            "selected_toppings",
+            "reschedule_requested_by_seller",
+            "reschedule_new_time",
+            "reschedule_approved_by_buyer",
+            "is_gift",
+            "is_anonymous",
+            "recipient_phone",
+            "recipient_name",
+            "recipient_address_text",
+            "recipient_latitude",
+            "recipient_longitude",
+            "recipient_specified_time",
+            "gift_proof_image",
             "delivery_type",
             "delivery_price",
+            "applied_promo_code",
+            "discount_amount",
+            "apartment",
+            "entrance",
+            "floor",
+            "intercom",
+            "delivery_comment",
         ]
 
 

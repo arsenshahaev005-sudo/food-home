@@ -447,6 +447,42 @@ class Order(models.Model):
         related_name="current_for_orders",
     )
 
+    # Gift order fields
+    is_gift = models.BooleanField(default=False, help_text="Whether this is a gift order")
+    is_anonymous = models.BooleanField(
+        default=False, help_text="Whether the sender should be hidden from recipient"
+    )
+    recipient_phone = models.CharField(
+        max_length=50, blank=True, default="", help_text="Phone number of gift recipient"
+    )
+    recipient_name = models.CharField(
+        max_length=255, blank=True, default="", help_text="Name of gift recipient"
+    )
+    recipient_address_text = models.TextField(
+        blank=True, default="", help_text="Delivery address for gift recipient"
+    )
+    recipient_latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, blank=True, null=True,
+        help_text="Latitude of recipient address"
+    )
+    recipient_longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, blank=True, null=True,
+        help_text="Longitude of recipient address"
+    )
+    recipient_specified_time = models.DateTimeField(
+        null=True, blank=True, help_text="When recipient specified delivery time"
+    )
+    gift_proof_image = models.URLField(
+        blank=True, null=True, help_text="Proof photo that gift was delivered"
+    )
+    recipient_token = models.CharField(
+        max_length=255, blank=True, default="",
+        help_text="Token for recipient to specify delivery details"
+    )
+    recipient_token_expires_at = models.DateTimeField(
+        null=True, blank=True, help_text="When recipient token expires"
+    )
+
     class Meta:
         indexes = [
             models.Index(fields=["status", "created_at"]),

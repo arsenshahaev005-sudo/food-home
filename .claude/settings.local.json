@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(python manage.py shell:*)",
+      "Bash(python:*)"
     ]
   }
 }

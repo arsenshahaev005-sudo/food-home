@@ -8,8 +8,8 @@ urlpatterns = [
     # Keep old API routes for backward compatibility during migration
     path('api/', include('api.urls')),
     path('api/auth/', include('api.auth_urls')),
-    # New API v1 structure - TODO: Раскомментировать после миграции
-    # path('api/v1/', include('api.v1.urls')),
+    # New API v1 structure
+    path('api/v1/', include('api.v1.urls')),
 ]
 
 if settings.DEBUG:
