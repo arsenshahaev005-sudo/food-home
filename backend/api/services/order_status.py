@@ -184,8 +184,16 @@ class OrderStatusService:
     @transaction.atomic
     def complete_by_buyer(self, order_id, actor: OrderActor):
         order = self._lock_order(order_id)
-        if actor.role not in ["BUYER", "ADMIN"]:
+        # Allow SELLER to complete orders (seller completes, not buyer)
+        if actor.role not in ["SELLER", "BUYER", "ADMIN"]:
             raise PermissionDeniedForTransition()
+        # Check seller permission
+        if actor.role == "SELLER":
+            producer = getattr(order.dish, "producer", None)
+            producer_user = getattr(producer, "user", None)
+            if producer_user and producer_user.id != actor.user.id:
+                raise PermissionDeniedForTransition()
+        # Check buyer permission
         if actor.role == "BUYER" and order.user_id != actor.user.id:
             raise PermissionDeniedForTransition()
         if order.status not in ["READY_FOR_REVIEW", "DELIVERING", "ARRIVED"]:

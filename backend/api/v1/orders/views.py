@@ -9,6 +9,12 @@ from rest_framework.response import Response
 
 from api.models import Order
 from api.services.order_service import OrderService
+from api.services.order_status import (
+    InvalidOrderTransition,
+    OrderActor,
+    OrderStatusService,
+    PermissionDeniedForTransition,
+)
 from api.v1.orders.serializers import (
     OrderAcceptSerializer,
     OrderCancelSerializer,
@@ -26,6 +32,27 @@ class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     permission_classes = [IsAuthenticated]
     order_service = OrderService()
+    status_service_class = OrderStatusService
+
+    def get_status_service(self):
+        return self.status_service_class()
+
+    def _build_order_actor(self, order):
+        user = self.request.user
+        if not user.is_authenticated:
+            role = "ANONYMOUS"
+        elif user.is_staff or user.is_superuser:
+            role = "ADMIN"
+        elif hasattr(user, "producer") and (
+            order.producer_id == getattr(user.producer, "id", None)
+            or order.dish.producer_id == getattr(user.producer, "id", None)
+        ):
+            role = "SELLER"
+        elif order.user_id == user.id:
+            role = "BUYER"
+        else:
+            role = "UNKNOWN"
+        return OrderActor(user=user, role=role)
 
     def get_queryset(self):
         """Возвращает список заказов для текущего пользователя."""
@@ -47,6 +74,72 @@ class OrderViewSet(viewsets.ModelViewSet):
         if self.action == "retrieve":
             return OrderDetailSerializer
         return OrderDetailSerializer
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def complete(self, request, pk=None):
+        try:
+            order = Order.objects.get(pk=pk)
+        except Order.DoesNotExist:
+            return Response(
+                {"detail": "Заказ не найден"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        actor = self._build_order_actor(order)
+        service = self.get_status_service()
+        try:
+            updated_order = service.complete_by_buyer(order.id, actor)
+        except PermissionDeniedForTransition:
+            return Response(
+                {"detail": "Недостаточно прав для изменения статуса заказа"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except InvalidOrderTransition:
+            return Response(
+                {"detail": "Order cannot be completed yet"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = OrderDetailSerializer(updated_order)
+        return Response(
+            {
+                "success": True,
+                "message": "Заказ завершен, средства зачислены",
+                "order": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def mark_arrived(self, request, pk=None):
+        try:
+            order = Order.objects.get(pk=pk)
+        except Order.DoesNotExist:
+            return Response(
+                {"detail": "Заказ не найден"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        actor = self._build_order_actor(order)
+        service = self.get_status_service()
+        try:
+            updated_order = service.mark_arrived(order.id, actor)
+        except PermissionDeniedForTransition:
+            return Response(
+                {"detail": "Недостаточно прав для изменения статуса заказа"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except InvalidOrderTransition:
+            return Response(
+                {"detail": "Order is not being delivered"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = OrderDetailSerializer(updated_order)
+        return Response(
+            {
+                "success": True,
+                "message": "Заказ прибыл к месту назначения",
+                "order": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def accept(self, request, pk=None):

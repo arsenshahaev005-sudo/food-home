@@ -966,8 +966,8 @@ export const startDeliveryOrder = async (orderId: string, token: string): Promis
   return response.json();
 };
 
-export const markArrivedOrder = async (orderId: string, token: string): Promise<any> => {
-  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/mark_arrived/`, {
+export const markArrivedOrder = async (orderId: string, token: string): Promise<Order> => {
+  const response = await fetch(`${API_BASE_URL}/api/v1/orders/${orderId}/mark_arrived/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -981,7 +981,8 @@ export const markArrivedOrder = async (orderId: string, token: string): Promise<
     throw error;
   }
 
-  return response.json();
+  const data = await response.json();
+  return data.order || data;
 };
 
 export const markReadyOrder = async (orderId: string, token: string): Promise<any> => {
@@ -1002,8 +1003,8 @@ export const markReadyOrder = async (orderId: string, token: string): Promise<an
   return response.json();
 };
 
-export const completeOrder = async (orderId: string, token: string): Promise<any> => {
-  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/complete/`, {
+export const completeOrder = async (orderId: string, token: string): Promise<Order> => {
+  const response = await fetch(`${API_BASE_URL}/api/v1/orders/${orderId}/complete/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1017,7 +1018,8 @@ export const completeOrder = async (orderId: string, token: string): Promise<any
     throw error;
   }
 
-  return response.json();
+  const data = await response.json();
+  return data.order || data;
 };
 
 // ============ Dish Management API functions ============

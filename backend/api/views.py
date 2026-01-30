@@ -458,7 +458,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(sender=self.request.user)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="mark_read")
     def mark_read(self, request, pk=None):
         message = self.get_object()
         if message.recipient != request.user:
@@ -583,7 +583,7 @@ class DishViewSet(viewsets.ModelViewSet):
         instance.save(update_fields=["views_count"])
         return super().retrieve(request, *args, **kwargs)
 
-    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser])
+    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser], url_path="upload_photo")
     def upload_photo(self, request, pk=None):
         dish = self.get_object()
         photo = request.FILES.get("photo")
@@ -638,7 +638,7 @@ class DishViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(dish)
         return Response(serializer.data)
 
-    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser])
+    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser], url_path="add_image")
     def add_image(self, request, pk=None):
         dish = self.get_object()
         image = request.FILES.get("image")
@@ -787,7 +787,7 @@ class PromoCodeViewSet(viewsets.ModelViewSet):
             return PromoCode.objects.filter(producer_id=producer_id)
         return super().get_queryset()
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="send_promo")
     def send_promo(self, request, pk=None):
         promo = self.get_object()
         # Mock SMS
@@ -867,7 +867,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
             review = serializer.save(photo=photo_url)
         self.get_rating_service().recalc_for_order(instance.order)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="offer_refund")
     def offer_refund(self, request, pk=None):
         review = self.get_object()
         amount = request.data.get("amount")
@@ -883,7 +883,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
         # Mock SMS to Buyer
         return Response({"detail": "Refund offer sent to buyer"})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="accept_refund")
     def accept_refund(self, request, pk=None):
         review = self.get_object()
         if review.user != request.user:
@@ -903,7 +903,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
             {"detail": "Offer accepted. Please update your rating to receive funds."}
         )
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="raise_dispute")
     def raise_dispute(self, request, pk=None):
         review = self.get_object()
         producer = getattr(review, "producer", None)
@@ -961,21 +961,39 @@ class OrderViewSet(viewsets.ModelViewSet):
         return role
 
     def _get_order_actor_role(self, order):
+        import logging
+        logger = logging.getLogger(__name__)
+
         user = self.request.user
+        logger.info(f"_get_order_actor_role: user={user}, authenticated={user.is_authenticated if user else False}")
+
         if not user.is_authenticated:
             return "ANONYMOUS"
         if user.is_staff or user.is_superuser:
             return "ADMIN"
-        if order.user_id == user.id:
-            return "BUYER"
+
+        # Check SELLER role first (before BUYER) so that sellers can manage their own test orders
         producer = getattr(user, "producer", None)
+        logger.info(f"_get_order_actor_role: user.producer={producer}")
+
         if producer:
             producer_id = getattr(producer, "id", None)
+            logger.info(f"_get_order_actor_role: producer_id={producer_id}")
+            logger.info(f"_get_order_actor_role: order.producer_id={order.producer_id}")
+            logger.info(f"_get_order_actor_role: order.dish.producer_id={order.dish.producer_id}")
+
             if producer_id and (
                 order.producer_id == producer_id
                 or order.dish.producer_id == producer_id
             ):
+                logger.info("_get_order_actor_role: returning SELLER")
                 return "SELLER"
+
+        # Check BUYER role after SELLER
+        if order.user_id == user.id:
+            return "BUYER"
+
+        logger.info("_get_order_actor_role: returning UNKNOWN")
         return "UNKNOWN"
 
     def _build_order_actor(self, order):
@@ -1459,6 +1477,40 @@ class OrderViewSet(viewsets.ModelViewSet):
             discount_amount=discount_amount,
         )
 
+    @action(detail=True, methods=["post"], url_path="start_delivery")
+    def start_delivery(self, request, pk=None):
+        import logging
+        logger = logging.getLogger(__name__)
+
+        order = self.get_object()
+        actor = self._build_order_actor(order)
+
+        logger.info(f"start_delivery: user={request.user}, user.id={request.user.id if request.user else None}")
+        logger.info(f"start_delivery: actor.role={actor.role}, actor.user={actor.user}")
+        logger.info(f"start_delivery: order.producer_id={order.producer_id}, order.dish.producer_id={order.dish.producer_id}")
+
+        # Check if user has producer
+        producer = getattr(request.user, 'producer', None)
+        logger.info(f"start_delivery: user.producer={producer}")
+        if producer:
+            logger.info(f"start_delivery: user.producer.id={producer.id}")
+
+        service = self.get_status_service()
+        try:
+            updated = service.start_delivery(order.id, actor)
+        except PermissionDeniedForTransition as e:
+            logger.error(f"start_delivery PermissionDeniedForTransition: {e}")
+            return Response(
+                {"detail": "Недостаточно прав для изменения статуса заказа"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except InvalidOrderTransition:
+            return Response(
+                {"detail": "Order not ready for delivery"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"detail": "Delivery started", "status": updated.status})
+
     @action(detail=True, methods=["post"])
     def tip(self, request, pk=None):
         order = self.get_object()
@@ -1538,14 +1590,14 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Payment.objects.all()
     permission_classes = [IsAuthenticated]
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="simulate_success")
     def simulate_success(self, request, pk=None):
         payment = self.get_object()
         service = PaymentService()
         service.simulate_payment_success(payment)
         return Response({"status": payment.status})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="simulate_fail")
     def simulate_fail(self, request, pk=None):
         payment = self.get_object()
         service = PaymentService()
@@ -1588,7 +1640,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return Response({"detail": "Paid/Held", "status": updated.status})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="init_payment")
     def init_payment(self, request, pk=None):
         order = self.get_object()
         service = PaymentService()
@@ -1609,7 +1661,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="get_sbp_qr")
     def get_sbp_qr(self, request, pk=None):
         """Get SBP QR for the order"""
         order = self.get_object()
@@ -1678,7 +1730,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             }
         )
 
-    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser])
+    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser], url_path="upload_photo")
     def upload_photo(self, request, pk=None):
         order = self.get_object()
         photo = request.FILES.get("photo")
@@ -1702,7 +1754,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             {"detail": "Photo uploaded", "photo_url": url, "status": order.status}
         )
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="mark_ready")
     def mark_ready(self, request, pk=None):
         order = self.get_object()
         actor = self._build_order_actor(order)
@@ -1721,7 +1773,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return Response({"detail": "Order marked as ready", "status": updated.status})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="approve_photo")
     def approve_photo(self, request, pk=None):
         order = self.get_object()
         actor = self._build_order_actor(order)
@@ -1740,7 +1792,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return Response({"detail": "Photo approved", "status": updated.status})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="start_delivery")
     def start_delivery(self, request, pk=None):
         order = self.get_object()
         actor = self._build_order_actor(order)
@@ -1759,7 +1811,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return Response({"detail": "Delivery started", "status": updated.status})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="mark_arrived")
     def mark_arrived(self, request, pk=None):
         order = self.get_object()
         actor = self._build_order_actor(order)
@@ -1799,7 +1851,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             {"detail": "Order completed, funds credited", "status": updated.status}
         )
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="raise_dispute")
     def raise_dispute(self, request, pk=None):
         order = self.get_object()
         actor = self._build_order_actor(order)
@@ -1820,7 +1872,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return Response({"detail": "Dispute raised"})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="resolve_dispute")
     def resolve_dispute(self, request, pk=None):
         order = self.get_object()
         actor = self._build_order_actor(order)
@@ -1859,7 +1911,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             {"detail": f"Dispute resolved: {resolution}", "status": updated.status}
         )
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="reschedule_delivery")
     def reschedule_delivery(self, request, pk=None):
         order = self.get_object()
         actor_role = self._get_order_actor_role(order)
@@ -1882,7 +1934,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Response({"detail": "Reschedule requested, waiting for buyer approval"})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="approve_reschedule")
     def approve_reschedule(self, request, pk=None):
         order = self.get_object()
         actor_role = self._get_order_actor_role(order)
@@ -1922,7 +1974,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Response({"detail": "Reschedule approved"})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="remove_penalty")
     def remove_penalty(self, request, pk=None):
         order = self.get_object()
         actor_role = self._get_order_actor_role(order)
@@ -1954,7 +2006,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Response({"detail": "Penalty point removed", "cost": cost})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="cancel_late_delivery")
     def cancel_late_delivery(self, request, pk=None):
         order = self.get_object()
         actor = self._build_order_actor(order)
@@ -2207,6 +2259,40 @@ class OrderCancelLateDeliveryView(APIView):
                 "detail": "Order cancelled due to delay, penalty applied",
                 "status": updated.status,
             }
+        )
+
+
+class OrderUploadPhotoView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, pk):
+        try:
+            order = Order.objects.get(id=pk)
+        except Order.DoesNotExist:
+            return Response(
+                {"detail": "Order not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        photo = request.FILES.get("photo")
+        if not photo:
+            return Response(
+                {"detail": "Photo file required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from django.core.files.storage import default_storage
+
+        path = default_storage.save(
+            f"orders/{order.id}_{uuid.uuid4().hex}_{photo.name}", photo
+        )
+        url = request.build_absolute_uri(settings.MEDIA_URL + path)
+
+        order.finished_photo = url
+        order.status = "READY_FOR_REVIEW"
+        order.ready_at = timezone.now()
+        order.save()
+        return Response(
+            {"detail": "Photo uploaded", "photo_url": url, "status": order.status}
         )
 
 
@@ -3729,7 +3815,7 @@ class PaymentMethodViewSet(viewsets.ModelViewSet):
 
         serializer.save(user=self.request.user, is_default=is_default)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="set_default")
     def set_default(self, request, pk=None):
         method = self.get_object()
         PaymentMethod.objects.filter(user=request.user).update(is_default=False)
@@ -3809,7 +3895,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
             "-created_at"
         )
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="mark_read")
     def mark_read(self, request, pk=None):
         notification = self.get_object()
         notification.is_read = True

@@ -20,6 +20,7 @@ from .views import (
     OrderDraftViewSet,
     OrderPayView,
     OrderRescheduleDeliveryView,
+    OrderUploadPhotoView,
     OrderViewSet,
     PaymentMethodViewSet,
     PaymentViewSet,
@@ -68,5 +69,6 @@ urlpatterns = [
     path('orders/<uuid:pk>/reschedule_delivery/', OrderRescheduleDeliveryView.as_view()),
     path('orders/<uuid:pk>/approve_reschedule/', OrderApproveRescheduleView.as_view()),
     path('orders/<uuid:pk>/cancel_late_delivery/', OrderCancelLateDeliveryView.as_view()),
+    path('orders/<uuid:pk>/upload_photo/', OrderUploadPhotoView.as_view()),
     path('orders/reorder/', ReorderView.as_view()),
 ]
