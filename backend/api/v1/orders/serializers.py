@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from api.models import Order
-from api.serializers import DishSerializer, ReviewSerializer, DisputeSerializer
+from api.serializers import DishSerializer, DisputeSerializer, ReviewSerializer
 
 
 class OrderAcceptSerializer(serializers.Serializer):

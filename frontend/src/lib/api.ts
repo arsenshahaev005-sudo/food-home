@@ -852,6 +852,174 @@ export const getOrders = async (token: string): Promise<Order[]> => {
   return data.data || data.results || data;
 };
 
+export const acceptOrder = async (orderId: string, token: string): Promise<Order> => {
+  const response = await fetch(`${API_BASE_URL}/api/v1/orders/${orderId}/accept/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ order_id: orderId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  const data = await response.json();
+  return data.order || data;
+};
+
+export const cancelOrder = async (
+  orderId: string,
+  _actor: 'seller' | 'buyer',
+  reason: string,
+  token: string,
+): Promise<Order> => {
+  const response = await fetch(`${API_BASE_URL}/api/v1/orders/${orderId}/cancel/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      order_id: orderId,
+      reason,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  const data = await response.json();
+  return data.order || data;
+};
+
+export const rejectOrder = async (
+  orderId: string,
+  reason: string,
+  token: string,
+): Promise<Order> => {
+  const response = await fetch(`${API_BASE_URL}/api/v1/orders/${orderId}/reject/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      order_id: orderId,
+      reason,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  const data = await response.json();
+  return data.order || data;
+};
+
+export const uploadOrderPhoto = async (
+  orderId: string,
+  photoFile: File,
+  token: string,
+): Promise<any> => {
+  const formData = new FormData();
+  formData.append('photo', photoFile);
+
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/upload_photo/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+export const startDeliveryOrder = async (orderId: string, token: string): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/start_delivery/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+export const markArrivedOrder = async (orderId: string, token: string): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/mark_arrived/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+export const markReadyOrder = async (orderId: string, token: string): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/mark_ready/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
+export const completeOrder = async (orderId: string, token: string): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/complete/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw error;
+  }
+
+  return response.json();
+};
+
 // ============ Dish Management API functions ============
 
 /**
@@ -880,7 +1048,7 @@ export const createDish = async (dishData: Partial<Dish>, token: string): Promis
  */
 export const updateDish = async (dishId: string, dishData: Partial<Dish>, token: string): Promise<Dish> => {
   const response = await fetch(`${API_BASE_URL}/api/dishes/${dishId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,

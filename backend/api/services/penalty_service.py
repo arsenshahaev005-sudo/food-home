@@ -45,21 +45,20 @@ class PenaltyService:
         if not order:
             raise ValidationError("Order is required")
 
-        # Увеличиваем consecutive_rejections
-        producer.consecutive_rejections = F('consecutive_rejections') + 1
-
-        # Увеличиваем penalty_points
-        producer.penalty_points = F('penalty_points') + 1
+        Producer.objects.filter(pk=producer.pk).update(
+            consecutive_rejections=F("consecutive_rejections") + 1,
+            penalty_points=F("penalty_points") + 1,
+        )
+        producer.refresh_from_db(fields=["consecutive_rejections", "penalty_points"])
 
         # Рассчитываем штраф 30% от стоимости заказа
         penalty_amount = order.total_price * Decimal("0.30")
 
-        # Сохраняем штраф в заказе
         order.penalty_amount = penalty_amount
-        order.penalty_reason = f"Отклонение заказа №{order.id}. {producer.consecutive_rejections} подряд."
+        order.penalty_reason = (
+            f"Отклонение заказа №{order.id}. {producer.consecutive_rejections} подряд."
+        )
 
-        # Сохраняем изменения
-        producer.save(update_fields=["consecutive_rejections", "penalty_points"])
         order.save(update_fields=["penalty_amount", "penalty_reason"])
 
         logger.info(
@@ -69,7 +68,6 @@ class PenaltyService:
             f"penalty_amount={penalty_amount}"
         )
 
-        # Проверяем, нужно ли забанить магазин
         if producer.consecutive_rejections >= 3:
             self.ban_producer(producer, reason=f"{producer.consecutive_rejections} непринятых заказа подряд")
 

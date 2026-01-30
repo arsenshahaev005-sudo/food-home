@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Order, getOrders, acceptOrder, completeOrder, uploadOrderPhoto, startDeliveryOrder, markArrivedOrder, markReadyOrder, cancelOrder } from "@/lib/api";
+import { Order, getOrders, acceptOrder, completeOrder, uploadOrderPhoto, startDeliveryOrder, markArrivedOrder, rejectOrder } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface SellerOrdersProps {
@@ -18,12 +18,10 @@ export default function SellerOrders({ token }: SellerOrdersProps) {
   const [filter, setFilter] = useState<OrderStatusFilter>('ALL');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [highlightedOrder, setHighlightedOrder] = useState<string | null>(null);
-  const [showChat, setShowChat] = useState<string | null>(null);
   const [showCompleteModal, setShowCompleteModal] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<Record<string, { role: 'user' | 'seller', text: string, time: string }[]>>({});
-  const [newMessage, setNewMessage] = useState("");
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
 
   const isActionLoading = (type: string, id: string | null) => {
@@ -114,8 +112,23 @@ export default function SellerOrders({ token }: SellerOrdersProps) {
       setActionLoading(`accept:${id}`);
       await acceptOrder(id, token);
       await loadOrders();
-    } catch (e) {
-      alert("Ошибка при принятии заказа");
+    } catch (e: unknown) {
+      let message = "Ошибка при принятии заказа";
+      if (e && typeof e === "object") {
+        const errorObject = e as {
+          details?: { non_field_errors?: string[] };
+          detail?: string;
+          message?: string;
+        };
+        if (errorObject.details?.non_field_errors?.length) {
+          message = errorObject.details.non_field_errors.join("\n");
+        } else if (errorObject.detail) {
+          message = String(errorObject.detail);
+        } else if (errorObject.message) {
+          message = String(errorObject.message);
+        }
+      }
+      alert(message);
     } finally {
       setActionLoading(null);
     }
@@ -192,6 +205,7 @@ export default function SellerOrders({ token }: SellerOrdersProps) {
       await startDeliveryOrder(id, token);
       await loadOrders();
     } catch (e) {
+      console.error("Ошибка при начале доставки", e);
       alert("Ошибка при начале доставки");
     } finally {
       setActionLoading(null);
@@ -204,6 +218,7 @@ export default function SellerOrders({ token }: SellerOrdersProps) {
       await markArrivedOrder(id, token);
       await loadOrders();
     } catch (e) {
+      console.error("Ошибка при отметке прибытия", e);
       alert("Ошибка при отметке прибытия");
     } finally {
       setActionLoading(null);
@@ -216,6 +231,7 @@ export default function SellerOrders({ token }: SellerOrdersProps) {
       await completeOrder(id, token);
       await loadOrders();
     } catch (e) {
+      console.error("Ошибка при завершении заказа", e);
       alert("Ошибка при завершении заказа");
     } finally {
       setActionLoading(null);
@@ -234,61 +250,14 @@ export default function SellerOrders({ token }: SellerOrdersProps) {
     if (!confirmed) return;
     try {
       setActionLoading(`cancel:${id}`);
-      await cancelOrder(id, "seller", "", token);
+      await rejectOrder(id, "", token);
       await loadOrders();
     } catch (e) {
+      console.error("Ошибка при отказе от заказа", e);
       alert("Ошибка при отказе от заказа");
     } finally {
       setActionLoading(null);
     }
-  };
-
-  const sendMessage = (orderId: string) => {
-    if (!newMessage.trim()) return;
-    const msg = { role: 'seller' as const, text: newMessage, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    
-    // Save to localStorage for synchronization with more info
-    const currentOrder = orders.find(o => o.id === orderId);
-    const currentChats = JSON.parse(localStorage.getItem('order_chats') || '{}');
-    const orderMsgs = currentChats[orderId] || [];
-    const updatedMsgs = [...orderMsgs, msg];
-    
-    // Store metadata if it's the first message or to keep it updated
-    currentChats[orderId] = updatedMsgs;
-    if (currentOrder) {
-      const metadata = JSON.parse(localStorage.getItem('order_metadata') || '{}');
-      
-      const userFirstName = (currentOrder as any).user_first_name || '';
-      const userLastName = (currentOrder as any).user_last_name || '';
-      const buyerFullName = (userFirstName || userLastName)
-        ? `${userFirstName} ${userLastName}`.trim()
-        : (currentOrder.user_name || 'Покупатель');
-
-      const sellerFirstName = (currentOrder as any).producer_first_name || '';
-      const sellerLastName = (currentOrder as any).producer_last_name || '';
-      const sellerFullName = (sellerFirstName || sellerLastName)
-        ? `${sellerFirstName} ${sellerLastName}`.trim()
-        : (currentOrder.producer_name || 'Продавец');
-
-      metadata[orderId] = {
-        dishName: currentOrder.dish.name,
-        dishPhoto: currentOrder.dish.photo,
-        userName: buyerFullName,
-        sellerName: sellerFullName,
-        orderDate: new Date(currentOrder.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }),
-        quantity: currentOrder.quantity,
-        totalPrice: currentOrder.total_price
-      };
-      localStorage.setItem('order_metadata', JSON.stringify(metadata));
-    }
-    
-    localStorage.setItem('order_chats', JSON.stringify(currentChats));
-    
-    setChatMessages(prev => ({
-      ...prev,
-      [orderId]: updatedMsgs
-    }));
-    setNewMessage("");
   };
 
   useEffect(() => {
@@ -338,58 +307,6 @@ export default function SellerOrders({ token }: SellerOrdersProps) {
 
         router.push(`/seller?view=CHAT&orderId=${order.id}`);
     };
-
-  const handleOpenDispute = (orderId: string) => {
-    if (confirm("Вы уверены, что хотите открыть спор по этому заказу?")) {
-      // Update metadata
-      const orderMeta = JSON.parse(localStorage.getItem('order_metadata') || '{}');
-      const currentOrder = orders.find(o => o.id === orderId);
-      
-      if (!orderMeta[orderId] && currentOrder) {
-        const userFirstName = (currentOrder as any).user_first_name || '';
-        const userLastName = (currentOrder as any).user_last_name || '';
-        const buyerFullName = (userFirstName || userLastName)
-          ? `${userFirstName} ${userLastName}`.trim()
-          : (currentOrder.user_name || 'Покупатель');
-
-        const sellerFirstName = (currentOrder as any).producer_first_name || '';
-        const sellerLastName = (currentOrder as any).producer_last_name || '';
-        const sellerFullName = (sellerFirstName || sellerLastName)
-          ? `${sellerFirstName} ${sellerLastName}`.trim()
-          : (currentOrder.producer_name || 'Продавец');
-
-        orderMeta[orderId] = {
-          dishName: currentOrder.dish.name,
-          dishPhoto: currentOrder.dish.photo,
-          userName: buyerFullName,
-          sellerName: sellerFullName,
-          orderDate: new Date(currentOrder.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }),
-          quantity: currentOrder.quantity,
-          totalPrice: currentOrder.total_price
-        };
-      }
-      
-      if (orderMeta[orderId]) {
-        orderMeta[orderId].status = 'DISPUTE';
-        localStorage.setItem('order_metadata', JSON.stringify(orderMeta));
-      }
-
-      // Add system message
-      const msg = { 
-        role: 'system', 
-        text: '⚠️ Был открыт спор по этому заказу. Поддержка Food&Home подключится в ближайшее время.', 
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-      };
-      
-      const currentChats = JSON.parse(localStorage.getItem('order_chats') || '{}');
-      const orderMsgs = currentChats[orderId] || [];
-      currentChats[orderId] = [...orderMsgs, msg];
-      localStorage.setItem('order_chats', JSON.stringify(currentChats));
-      
-      // Update local state
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'DISPUTE' } : o));
-    }
-  };
 
   const getStatusBadge = (status: Order['status']) => {
     const styles: Record<string, string> = {

@@ -6,6 +6,8 @@
  * повышают доверие пользователей.
  */
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export interface Review {
   id: string;
   order: string;
@@ -50,4 +52,64 @@ export interface SellerResponseFormData {
   review_id: string;
   answer: string;
   photo?: File;
+}
+
+function normalizeReviewListResponse(data: unknown): Review[] {
+  if (Array.isArray(data)) {
+    return data as Review[];
+  }
+
+  if (
+    data &&
+    typeof data === "object" &&
+    Array.isArray((data as { results?: unknown }).results)
+  ) {
+    return (data as { results: Review[] }).results;
+  }
+
+  return [];
+}
+
+export async function getProducerReviews(
+  arg1: string,
+  arg2?: string,
+): Promise<Review[]> {
+  const hasToken = typeof arg2 === "string";
+  const token = hasToken ? arg1 : undefined;
+  const producerId = hasToken ? (arg2 as string) : arg1;
+
+  const params = new URLSearchParams();
+  params.append("producer", producerId);
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/reviews/?${params.toString()}`,
+    {
+      method: "GET",
+      headers,
+    },
+  );
+
+  if (!response.ok) {
+    try {
+      const errorBody = await response.json();
+      throw errorBody;
+    } catch (e) {
+      console.error("[getProducerReviews] Failed to parse error JSON", e);
+      throw {
+        detail: "Не удалось загрузить отзывы",
+        status: response.status,
+      };
+    }
+  }
+
+  const data = await response.json();
+  return normalizeReviewListResponse(data);
 }
