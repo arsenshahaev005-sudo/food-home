@@ -93,6 +93,9 @@ flake8_report.txt
 *.tmp
 
 
+# Windows reserved-name artifacts
+backend/nul
+
 .next/
 
 # Auto Claude data directory

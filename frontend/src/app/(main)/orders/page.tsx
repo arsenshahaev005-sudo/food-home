@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getOrders, approveOrderPhoto, createReview, updateReview, acceptReviewRefund, reorderOrder, getFullImageUrl, type Order, type Review } from "@/lib/api";
+import { getOrders, approveOrderPhoto, createReview, updateReview, acceptReviewRefund, getFullImageUrl, type Order, type Review } from "@/lib/api";
 import Link from "next/link";
+import DishQuickViewModal from "@/components/DishQuickViewModal";
 
 // I'll use a client-side way to get the token or pass it from a parent if possible.
 // Since this is a new page, I'll use a small helper to get the token from cookies on the client.
@@ -24,6 +25,8 @@ export default function OrdersPage() {
   const [chatMessages, setChatMessages] = useState<Record<string, { role: 'user' | 'seller', text: string, time: string }[]>>({});
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, { taste: number; appearance: number; service: number; comment: string; photoFile?: File | null; photoPreview?: string | null; existingPhoto?: string | null }>>({});
   const [reviewSubmitting, setReviewSubmitting] = useState<string | null>(null);
+  const [dishQuickViewOpen, setDishQuickViewOpen] = useState(false);
+  const [dishQuickViewId, setDishQuickViewId] = useState<string | null>(null);
 
   useEffect(() => {
     const t = getCookie("accessToken");
@@ -142,6 +145,11 @@ export default function OrdersPage() {
 
   const toggleExpand = (id: string) => {
     setExpandedOrder(expandedOrder === id ? null : id);
+  };
+
+  const handleOpenDish = (dishId: string) => {
+    setDishQuickViewId(dishId);
+    setDishQuickViewOpen(true);
   };
 
   useEffect(() => {
@@ -286,7 +294,8 @@ export default function OrdersPage() {
           prev.map(o => (o.id === order.id ? { ...o, review: updated as any } : o))
         );
       }
-    } catch {
+    } catch (error) {
+      console.error("Error submitting review:", error);
       alert("Не удалось сохранить отзыв");
     } finally {
       setReviewSubmitting(null);
@@ -322,6 +331,13 @@ export default function OrdersPage() {
   }
 
   return (
+    <>
+      <DishQuickViewModal
+        isOpen={dishQuickViewOpen}
+        dishId={dishQuickViewId}
+        initialDish={null}
+        onClose={() => setDishQuickViewOpen(false)}
+      />
     <div className="max-w-4xl mx-auto py-8 px-4 space-y-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -538,8 +554,12 @@ export default function OrdersPage() {
                               </div>
                             </div>
                             <div className="pt-2 flex items-center gap-3">
-                              <Link
-                                href={`/dishes/${order.dish.id}`}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenDish(order.dish.id);
+                                }}
                                 className="inline-flex items-center gap-2 text-xs font-black text-[#c9825b] hover:underline bg-[#c9825b]/5 px-4 py-2 rounded-xl transition-colors hover:bg-[#c9825b]/10"
                               >
                                 Перейти к блюду
@@ -553,44 +573,7 @@ export default function OrdersPage() {
                                 >
                                   <path d="M5 12h14M12 5l7 7-7 7" />
                                 </svg>
-                              </Link>
-                              
-                              {/* Reorder Button */}
-                              {order.status === "COMPLETED" && (
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (!token) {
-                                    alert('Для повторного заказа необходимо авторизоваться');
-                                    return;
-                                  }
-                                  
-                                  if (confirm(`Вы уверены, что хотите повторить заказ "${order.dish.name}"?`)) {
-                                    try {
-                                      await reorderOrder(order.id, token);
-                                      alert('Заказ успешно повторен!');
-                                      fetchOrders(token, true);
-                                    } catch (error) {
-                                      console.error('Error reordering:', error);
-                                      alert('Ошибка при создании повторного заказа');
-                                    }
-                                  }
-                                }}
-                                className="inline-flex items-center gap-2 text-xs font-black text-white bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl transition-colors"
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  strokeWidth={2.5}
-                                  stroke="currentColor"
-                                  className="w-4 h-4"
-                                >
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 3h5m0 0v5m0-5-2 2M6.5 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM11 13H9l-3 9h10l-3-9ZM2.5 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z" />
-                                </svg>
-                                Повторить
                               </button>
-                              )}
 
                               {["WAITING_FOR_ACCEPTANCE", "COOKING", "READY_FOR_REVIEW"].includes(
                                 order.status
@@ -1126,5 +1109,6 @@ export default function OrdersPage() {
       {/* Chat Modal */}
       {/* Chat Modal removed and redirected to /chat */}
     </div>
+    </>
   );
 }

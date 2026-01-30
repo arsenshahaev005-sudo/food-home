@@ -61,10 +61,17 @@ function normalizeReviewListResponse(data: unknown): Review[] {
 
   if (
     data &&
-    typeof data === "object" &&
-    Array.isArray((data as { results?: unknown }).results)
+    typeof data === "object"
   ) {
-    return (data as { results: Review[] }).results;
+    // Check for 'data' field (new API format)
+    if (Array.isArray((data as { data?: unknown }).data)) {
+      return (data as { data: Review[] }).data;
+    }
+
+    // Check for 'results' field (paginated format)
+    if (Array.isArray((data as { results?: unknown }).results)) {
+      return (data as { results: Review[] }).results;
+    }
   }
 
   return [];

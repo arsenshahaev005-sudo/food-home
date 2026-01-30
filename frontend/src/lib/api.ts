@@ -1022,6 +1022,198 @@ export const completeOrder = async (orderId: string, token: string): Promise<Ord
   return data.order || data;
 };
 
+// ============ Review API functions ============
+
+export interface ReviewData {
+  order: string;
+  rating_taste: number;
+  rating_appearance: number;
+  rating_service: number;
+  comment?: string;
+}
+
+/**
+ * Создать отзыв
+ */
+export const createReview = async (
+  reviewData: ReviewData,
+  token: string,
+  photoFile?: File
+): Promise<any> => {
+  if (!token || token.trim().length === 0) {
+    console.error('createReview: invalid token provided');
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+
+  // If there's a photo, use FormData
+  if (photoFile) {
+    const formData = new FormData();
+    formData.append('order', reviewData.order);
+    formData.append('rating_taste', reviewData.rating_taste.toString());
+    formData.append('rating_appearance', reviewData.rating_appearance.toString());
+    formData.append('rating_service', reviewData.rating_service.toString());
+    if (reviewData.comment) {
+      formData.append('comment', reviewData.comment);
+    }
+    formData.append('photo', photoFile);
+
+    const response = await fetch(`${API_BASE_URL}/api/reviews/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('createReview: API error', error);
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  // Without photo, use JSON
+  const response = await fetch(`${API_BASE_URL}/api/reviews/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(reviewData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    console.error('createReview: API error', error);
+    throw error;
+  }
+
+  return response.json();
+};
+
+/**
+ * Обновить отзыв
+ */
+export const updateReview = async (
+  reviewId: string,
+  reviewData: Partial<ReviewData>,
+  token: string,
+  photoFile?: File
+): Promise<any> => {
+  if (!token || token.trim().length === 0) {
+    console.error('updateReview: invalid token provided');
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+
+  // If there's a photo, use FormData
+  if (photoFile) {
+    const formData = new FormData();
+    if (reviewData.rating_taste !== undefined) {
+      formData.append('rating_taste', reviewData.rating_taste.toString());
+    }
+    if (reviewData.rating_appearance !== undefined) {
+      formData.append('rating_appearance', reviewData.rating_appearance.toString());
+    }
+    if (reviewData.rating_service !== undefined) {
+      formData.append('rating_service', reviewData.rating_service.toString());
+    }
+    if (reviewData.comment !== undefined) {
+      formData.append('comment', reviewData.comment);
+    }
+    formData.append('photo', photoFile);
+
+    const response = await fetch(`${API_BASE_URL}/api/reviews/${reviewId}/`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('updateReview: API error', error);
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  // Without photo, use JSON
+  const response = await fetch(`${API_BASE_URL}/api/reviews/${reviewId}/`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(reviewData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    console.error('updateReview: API error', error);
+    throw error;
+  }
+
+  return response.json();
+};
+
+/**
+ * Одобрить фото готового блюда
+ */
+export const approveOrderPhoto = async (orderId: string, token: string): Promise<Order> => {
+  if (!token || token.trim().length === 0) {
+    console.error('approveOrderPhoto: invalid token provided');
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/approve_photo/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    console.error('approveOrderPhoto: API error', error);
+    throw error;
+  }
+
+  return response.json();
+};
+
+/**
+ * Принять предложение возврата средств по отзыву
+ */
+export const acceptReviewRefund = async (reviewId: string, token: string): Promise<any> => {
+  if (!token || token.trim().length === 0) {
+    console.error('acceptReviewRefund: invalid token provided');
+    throw new Error('Invalid token: token is empty or contains only whitespace');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/reviews/${reviewId}/accept_refund/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    console.error('acceptReviewRefund: API error', error);
+    throw error;
+  }
+
+  return response.json();
+};
+
 // ============ Dish Management API functions ============
 
 /**
