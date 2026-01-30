@@ -408,6 +408,13 @@ class OrderService:
         if not producer:
             raise ValidationError("Producer is required")
 
+        # Проверяем, не заблокирован ли магазин
+        if producer.is_banned:
+            raise ValidationError(
+                f"Ваш магазин заблокирован. Причина: {producer.ban_reason}. "
+                "Для разблокировки обратитесь в службу поддержки."
+            )
+
         # Проверяем статус заказа
         if order.status != "WAITING_FOR_ACCEPTANCE":
             raise ValidationError("Можно принять только заказы в статусе WAITING_FOR_ACCEPTANCE")

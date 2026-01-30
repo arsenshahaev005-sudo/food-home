@@ -10,7 +10,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from api.models import Dish, Order, Producer
+from api.models import Dish, Order, Producer, Review
 
 from .notifications import NotificationService
 from .payment_service import PaymentService
@@ -51,8 +51,9 @@ class PenaltyService:
         )
         producer.refresh_from_db(fields=["consecutive_rejections", "penalty_points"])
 
-        # Рассчитываем штраф 30% от стоимости заказа
-        penalty_amount = order.total_price * Decimal("0.30")
+        # Рассчитываем штраф 30% от стоимости ТОВАРА (без доставки)
+        dish_price = order.dish.price * order.quantity
+        penalty_amount = dish_price * Decimal("0.30")
 
         order.penalty_amount = penalty_amount
         order.penalty_reason = (
@@ -61,6 +62,35 @@ class PenaltyService:
 
         order.save(update_fields=["penalty_amount", "penalty_reason"])
 
+        # Создаем автоматический отзыв с 1 звездой
+        from api.services.rating_service import RatingService
+
+        # Проверяем, нет ли уже отзыва для этого заказа
+        if not hasattr(order, 'review'):
+            try:
+                Review.objects.create(
+                    order=order,
+                    user=order.user,
+                    producer=producer,
+                    rating_taste=1,
+                    rating_appearance=1,
+                    rating_service=1,
+                    rating_portion=1,
+                    rating_packaging=1,
+                    comment="Автоматический отзыв: заказ отклонен продавцом",
+                    is_auto_generated=True,
+                )
+
+                # Пересчитываем рейтинг магазина
+                rating_service = RatingService()
+                rating_service.recalc_for_producer(producer)
+
+                logger.info(f"Auto-generated review created for order {order.id}")
+            except Exception as e:
+                logger.error(f"Failed to create auto-generated review for order {order.id}: {e}")
+        else:
+            logger.warning(f"Review already exists for order {order.id}")
+
         logger.info(
             f"Penalty applied to producer {producer.id}: "
             f"consecutive_rejections={producer.consecutive_rejections}, "
@@ -68,7 +98,18 @@ class PenaltyService:
             f"penalty_amount={penalty_amount}"
         )
 
-        if producer.consecutive_rejections >= 3:
+        # Определяем порог бана: 3 отказа обычно, 4 если оплачивал штраф в ЭТОМ месяце
+        ban_threshold = 3
+        if producer.last_penalty_payment_date:
+            # Проверяем, была ли оплата в текущем месяце
+            from dateutil.relativedelta import relativedelta
+            current_month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+            if producer.last_penalty_payment_date >= current_month_start:
+                # Оплата была в этом месяце - даем +1 шанс
+                ban_threshold = 4
+
+        if producer.consecutive_rejections >= ban_threshold:
             self.ban_producer(producer, reason=f"{producer.consecutive_rejections} непринятых заказа подряд")
 
         return order
@@ -107,16 +148,20 @@ class PenaltyService:
         return producer
 
     @transaction.atomic
-    def clear_penalty_point(self, producer: Producer, order: Order) -> bool:
+    def pay_penalty_fine(self, producer: Producer, order: Order) -> bool:
         """
-        Уменьшает penalty_points на 1 и получает платёж 30% от стоимости заказа.
+        Оплачивает штраф: списывает 30% от стоимости непринятого заказа
+        и уменьшает penalty_points на 1.
 
         Args:
             producer: Магазин (Producer)
-            order: Заказ
+            order: Заказ, за который был штраф
 
         Returns:
             bool: True если успешно
+
+        Raises:
+            ValidationError: Если недостаточно средств или некорректные данные
         """
         if not producer:
             raise ValidationError("Producer is required")
@@ -125,22 +170,61 @@ class PenaltyService:
 
         if producer.penalty_points <= 0:
             logger.warning(f"Producer {producer.id} has no penalty points to clear")
-            return False
+            raise ValidationError("У вас нет штрафных очков для оплаты")
 
-        # Уменьшаем penalty_points
+        # Проверяем ограничение 1 раз в месяц
+        if producer.last_penalty_payment_date:
+            from dateutil.relativedelta import relativedelta
+            month_ago = timezone.now() - relativedelta(months=1)
+
+            if producer.last_penalty_payment_date > month_ago:
+                next_available_date = producer.last_penalty_payment_date + relativedelta(months=1)
+                raise ValidationError(
+                    f"Оплата штрафа доступна только 1 раз в месяц. "
+                    f"Следующая возможная дата: {next_available_date.strftime('%d.%m.%Y')}"
+                )
+
+        # Рассчитываем штраф 30% от стоимости ТОВАРА (без доставки)
+        dish_price = order.dish.price * order.quantity
+        penalty_amount = dish_price * Decimal("0.30")
+
+        # Проверяем достаточность средств
+        if producer.balance < penalty_amount:
+            raise ValidationError(
+                f"Недостаточно средств на балансе. "
+                f"Требуется: {penalty_amount}, доступно: {producer.balance}"
+            )
+
+        # Списываем штраф с баланса магазина
+        producer.balance -= penalty_amount
         producer.penalty_points -= 1
-        producer.save(update_fields=["penalty_points"])
+        producer.last_penalty_payment_date = timezone.now()
+        producer.save(update_fields=["balance", "penalty_points", "last_penalty_payment_date"])
 
-        # Получаем платёж 30% от стоимости заказа
-        penalty_amount = order.total_price * Decimal("0.30")
+        # Удаляем автоматический отзыв, связанный с этим заказом
+        from api.services.rating_service import RatingService
 
-        # Начисляем на баланс магазина
-        producer.balance += penalty_amount
-        producer.save(update_fields=["balance"])
+        try:
+            auto_review = Review.objects.get(
+                order=order,
+                is_auto_generated=True
+            )
+            auto_review.delete()
+
+            # Пересчитываем рейтинг после удаления отзыва
+            rating_service = RatingService()
+            rating_service.recalc_for_producer(producer)
+
+            logger.info(f"Auto-generated review deleted for order {order.id}")
+        except Review.DoesNotExist:
+            logger.warning(f"No auto-generated review found for order {order.id}")
+        except Exception as e:
+            logger.error(f"Failed to delete auto-generated review for order {order.id}: {e}")
 
         logger.info(
-            f"Penalty point cleared for producer {producer.id}. "
-            f"Amount credited: {penalty_amount}"
+            f"Penalty fine paid by producer {producer.id}. "
+            f"Amount deducted: {penalty_amount}, "
+            f"Remaining penalty_points: {producer.penalty_points}"
         )
 
         return True

@@ -57,6 +57,11 @@ class Producer(models.Model):
     penalty_points = models.PositiveIntegerField(default=0)  # "Единицы" штрафов
     consecutive_rejections = models.PositiveIntegerField(default=0)
     is_banned = models.BooleanField(default=False)
+    last_penalty_payment_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Дата последней оплаты штрафа"
+    )
 
     # Status & Schedule
     is_hidden = models.BooleanField(default=False)  # Archive/Hide from list
@@ -512,6 +517,10 @@ class Review(models.Model):
 
     photo = models.URLField(blank=True, null=True)
     video = models.URLField(blank=True, null=True, help_text="URL к видео отзыва")
+    is_auto_generated = models.BooleanField(
+        default=False,
+        help_text="Автоматически созданный отзыв при отклонении заказа продавцом"
+    )
 
     # Detailed ratings for specific aspects
     rating_portion = models.PositiveIntegerField(

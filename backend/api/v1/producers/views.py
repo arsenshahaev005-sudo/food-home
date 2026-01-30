@@ -6,8 +6,11 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from api.models import Producer, Profile
+from dateutil.relativedelta import relativedelta
+
+from api.models import Order, Producer, Profile
 from api.services.dispute_service import DisputeService
+from api.services.penalty_service import PenaltyService
 from api.services.repeat_purchase_service import RepeatPurchaseService
 
 logger = logging.getLogger(__name__)
@@ -231,3 +234,148 @@ class ProducerViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK
         )
+
+    @action(detail=True, methods=['get'])
+    def penalty_info(self, request, pk=None):
+        """
+        Получить информацию о штрафах магазина.
+        """
+        user = request.user
+
+        # Проверяем, что пользователь - продавец
+        if not hasattr(user, "producer"):
+            return Response(
+                {"error": "Только продавцы могут просматривать информацию о штрафах"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        producer = user.producer
+
+        # Проверяем, что это его магазин
+        if str(producer.id) != pk:
+            return Response(
+                {"error": "Вы можете просматривать только информацию о своем магазине"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Получаем заказы, за которые были штрафы
+        rejected_orders = Order.objects.filter(
+            producer=producer,
+            cancelled_by="SELLER",
+            penalty_amount__gt=0
+        ).order_by("-cancelled_at")[:10]
+
+        penalty_orders = []
+        for order in rejected_orders:
+            penalty_orders.append({
+                "order_id": str(order.id),
+                "penalty_amount": float(order.penalty_amount),
+                "order_total": float(order.total_price),
+                "cancelled_at": order.cancelled_at.isoformat() if order.cancelled_at else None,
+                "penalty_reason": order.penalty_reason,
+            })
+
+        # Рассчитываем дату следующей доступной оплаты
+        next_payment_date = None
+        if producer.last_penalty_payment_date:
+            next_payment_date = (
+                producer.last_penalty_payment_date + relativedelta(months=1)
+            ).isoformat()
+
+        return Response(
+            {
+                "success": True,
+                "penalty_points": producer.penalty_points,
+                "consecutive_rejections": producer.consecutive_rejections,
+                "is_banned": producer.is_banned,
+                "ban_reason": producer.ban_reason if producer.is_banned else None,
+                "balance": float(producer.balance),
+                "last_penalty_payment_date": (
+                    producer.last_penalty_payment_date.isoformat()
+                    if producer.last_penalty_payment_date else None
+                ),
+                "next_payment_available_date": next_payment_date,
+                "recent_penalties": penalty_orders,
+            },
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def pay_penalty(self, request, pk=None):
+        """
+        Оплатить штраф (снять одно штрафное очко за 30% от стоимости заказа).
+        """
+        user = request.user
+
+        # Проверяем, что пользователь - продавец
+        if not hasattr(user, "producer"):
+            return Response(
+                {"error": "Только продавцы могут оплачивать штрафы"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        producer = user.producer
+
+        # Проверяем, что это его магазин
+        if str(producer.id) != pk:
+            return Response(
+                {"error": "Вы можете оплачивать только штрафы своего магазина"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Получаем ID заказа
+        order_id = request.data.get("order_id")
+        if not order_id:
+            return Response(
+                {"error": "Необходимо указать order_id"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Находим заказ
+        try:
+            order = Order.objects.get(id=order_id, producer=producer)
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Заказ не найден или не принадлежит вашему магазину"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Проверяем, что заказ был отклонен
+        if order.cancelled_by != "SELLER":
+            return Response(
+                {"error": "Можно оплачивать штраф только за отклоненные заказы"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Оплачиваем штраф
+        penalty_service = PenaltyService()
+        try:
+            penalty_service.pay_penalty_fine(producer, order)
+            producer.refresh_from_db()
+
+            next_available_date = None
+            if producer.last_penalty_payment_date:
+                next_available_date = (
+                    producer.last_penalty_payment_date + relativedelta(months=1)
+                ).isoformat()
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Штраф успешно оплачен",
+                    "penalty_points_remaining": producer.penalty_points,
+                    "balance_remaining": float(producer.balance),
+                    "last_payment_date": (
+                        producer.last_penalty_payment_date.isoformat()
+                        if producer.last_penalty_payment_date else None
+                    ),
+                    "next_payment_available_date": next_available_date,
+                },
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Failed to pay penalty for producer {producer.id}: {e}")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )

@@ -1,4 +1,6 @@
 """Reviews API v1 views."""
+from django.core.exceptions import ValidationError
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -34,6 +36,29 @@ class ReviewViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(user=user)
 
         return queryset
+
+    def perform_create(self, serializer):
+        """
+        Переопределяем создание отзыва, чтобы проверить,
+        не был ли заказ отменен продавцом.
+        """
+        order = serializer.validated_data.get('order')
+
+        # Проверяем, не отменен ли заказ продавцом
+        if order and order.cancelled_by == "SELLER":
+            raise ValidationError(
+                "Нельзя создать отзыв для заказа, отмененного продавцом. "
+                "Автоматический отзыв уже был создан."
+            )
+
+        # Проверяем, нет ли уже автоматического отзыва
+        if order and hasattr(order, 'review') and order.review.is_auto_generated:
+            raise ValidationError(
+                "Для этого заказа уже существует автоматический отзыв. "
+                "Вы не можете создать свой отзыв."
+            )
+
+        serializer.save(user=self.request.user)
 
     @action(detail=True, methods=['post'])
     def request_correction(self, request, pk=None):

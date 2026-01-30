@@ -3,7 +3,8 @@
     "allow": [
       "Bash(curl:*)",
       "Bash(python manage.py shell:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(pip install:*)"
     ]
   }
 }
