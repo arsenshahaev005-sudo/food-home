@@ -486,9 +486,19 @@ export const api = {
     
     getFinancialSummary: () =>
       fetch(`${API_BASE_URL}/producers/financial_summary/`),
-    
+
     getPenaltyHistory: () =>
       fetch(`${API_BASE_URL}/producers/penalty_history/`),
+
+    getPenaltyInfo: (producerId: string, token: string) =>
+      apiGetAuth(`/api/v1/producers/${producerId}/penalty_info/`, token),
+
+    payPenalty: (producerId: string, orderId: string, token: string) =>
+      apiPostAuth(
+        `/api/v1/producers/${producerId}/pay_penalty/`,
+        token,
+        { order_id: orderId }
+      ),
   },
 };
 

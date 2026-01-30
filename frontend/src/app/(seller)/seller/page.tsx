@@ -81,7 +81,8 @@ function SellerPageInner() {
   }
 
   if (currentView === 'FINANCE') {
-      return <SellerFinance />;
+      const token = getCookie("accessToken");
+      return <SellerFinance profile={profile} token={token || ""} />;
   }
 
   if (currentView === 'REVIEWS') {

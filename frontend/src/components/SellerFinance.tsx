@@ -1,14 +1,23 @@
 'use client';
 
 import React from 'react';
+import PenaltyStatus from './finances/PenaltyStatus';
 
-export default function SellerFinance() {
+interface SellerFinanceProps {
+  profile: any;
+  token: string;
+}
+
+export default function SellerFinance({ profile, token }: SellerFinanceProps) {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Финансы</h1>
-        <p className="text-gray-500 mt-1">Управление доходами, выплатами и реквизитами</p>
+        <p className="text-gray-500 mt-1">Управление доходами, выплатами и штрафами</p>
       </div>
+
+      {/* Penalty Status Section */}
+      <PenaltyStatus producerId={profile.producer_id || profile.id} token={token} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Balance Card */}

@@ -13,12 +13,15 @@ from api.services.dispute_service import DisputeService
 from api.services.penalty_service import PenaltyService
 from api.services.repeat_purchase_service import RepeatPurchaseService
 
+from .serializers import ProducerSerializer
+
 logger = logging.getLogger(__name__)
 
 
 class ProducerViewSet(viewsets.ModelViewSet):
     """ViewSet для работы с магазинами."""
 
+    serializer_class = ProducerSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

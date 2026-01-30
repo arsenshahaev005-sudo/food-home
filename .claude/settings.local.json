@@ -4,7 +4,9 @@
       "Bash(curl:*)",
       "Bash(python manage.py shell:*)",
       "Bash(python:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)"
     ]
   }
 }
