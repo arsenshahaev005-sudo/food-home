@@ -3,7 +3,7 @@ import logging
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from dateutil.relativedelta import relativedelta
@@ -382,3 +382,135 @@ class ProducerViewSet(viewsets.ModelViewSet):
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+    @action(detail=True, methods=['post'], url_path='close_store')
+    def close_store(self, request, pk=None):
+        """
+        POST /api/producers/{id}/close_store/
+
+        Закрывает магазин на остаток дня.
+        Доступно только владельцу и только в рабочие часы.
+        """
+        from django.utils import timezone
+        from api.services.scheduling_service import SchedulingService
+
+        producer = self.get_object()
+
+        # Проверка прав доступа
+        if request.user != producer.user:
+            return Response(
+                {"detail": "У вас нет прав для управления этим магазином."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        scheduling_service = SchedulingService()
+        now = timezone.now()
+
+        # Проверка: магазин должен быть в рабочих часах
+        if not scheduling_service.is_within_working_hours(producer, now):
+            return Response(
+                {
+                    "detail": "Нельзя закрыть магазин вне рабочих часов.",
+                    "next_open_at": scheduling_service.get_next_open_datetime(producer)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Закрываем магазин
+        from django.conf import settings
+        import pytz
+        local_tz = pytz.timezone(settings.TIME_ZONE)
+
+        producer.is_hidden = True
+        producer.manual_closed_date = now.astimezone(local_tz).date()
+        producer.save(update_fields=['is_hidden', 'manual_closed_date'])
+
+        # Возвращаем статус
+        is_open, closure_reason = scheduling_service.is_store_open_now(producer, now)
+
+        return Response({
+            "is_open": is_open,
+            "closure_reason": closure_reason,
+            "next_open_at": scheduling_service.get_next_open_datetime(producer)
+        })
+
+    @action(detail=True, methods=['post'], url_path='open_store')
+    def open_store(self, request, pk=None):
+        """
+        POST /api/producers/{id}/open_store/
+
+        Открывает магазин (отменяет ручное закрытие).
+        Доступно только владельцу и только в рабочие часы.
+        """
+        from django.utils import timezone
+        from api.services.scheduling_service import SchedulingService
+
+        producer = self.get_object()
+
+        # Проверка прав доступа
+        if request.user != producer.user:
+            return Response(
+                {"detail": "У вас нет прав для управления этим магазином."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        scheduling_service = SchedulingService()
+        now = timezone.now()
+
+        # КРИТИЧНО: нельзя открыть вне рабочих часов
+        if not scheduling_service.is_within_working_hours(producer, now):
+            working_hours = scheduling_service._get_working_hours_for_date(producer, now.date())
+
+            return Response(
+                {
+                    "detail": "Нельзя открыть магазин вне рабочих часов. Измените расписание работы.",
+                    "working_hours_today": {
+                        "start": working_hours[0].strftime('%H:%M') if working_hours else None,
+                        "end": working_hours[1].strftime('%H:%M') if working_hours else None
+                    } if working_hours else None,
+                    "next_open_at": scheduling_service.get_next_open_datetime(producer)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Открываем магазин (сбрасываем ручное закрытие)
+        producer.is_hidden = False
+        producer.manual_closed_date = None
+        producer.save(update_fields=['is_hidden', 'manual_closed_date'])
+
+        return Response({
+            "is_open": True,
+            "closure_reason": None,
+            "next_open_at": None
+        })
+
+    @action(detail=True, methods=['get'], url_path='store_status', permission_classes=[AllowAny])
+    def get_store_status(self, request, pk=None):
+        """
+        GET /api/producers/{id}/store_status/
+
+        Публичный эндпоинт для получения статуса магазина.
+        Доступен всем (включая неавторизованных покупателей).
+        """
+        from django.utils import timezone
+        from api.services.scheduling_service import SchedulingService
+
+        producer = self.get_object()
+        scheduling_service = SchedulingService()
+        now = timezone.now()
+
+        is_within_hours = scheduling_service.is_within_working_hours(producer, now)
+        is_open, closure_reason = scheduling_service.is_store_open_now(producer, now)
+
+        working_hours = scheduling_service._get_working_hours_for_date(producer, now.date())
+
+        return Response({
+            "is_within_working_hours": is_within_hours,
+            "is_store_open_now": is_open,
+            "closure_reason": closure_reason,
+            "next_open_at": scheduling_service.get_next_open_datetime(producer),
+            "current_working_hours": {
+                "start": working_hours[0].strftime('%H:%M'),
+                "end": working_hours[1].strftime('%H:%M')
+            } if working_hours else None
+        })

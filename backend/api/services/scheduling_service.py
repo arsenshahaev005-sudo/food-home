@@ -233,13 +233,152 @@ class SchedulingService:
 
     def _is_time_in_working_hours(self, producer, dt: datetime) -> bool:
         """Check if a datetime falls within working hours."""
-        target_date = dt.date()
+        # Convert to local timezone for comparison
+        # Working hours are stored in local time, so we need to compare against local time
+        from django.conf import settings
+        import pytz
+
+        # Get the configured timezone
+        local_tz = pytz.timezone(settings.TIME_ZONE)
+
+        # Convert UTC datetime to local timezone
+        dt_local = dt.astimezone(local_tz)
+        target_date = dt_local.date()
+
         working_hours = self._get_working_hours_for_date(producer, target_date)
 
         if not working_hours:
             return False  # Closed
 
         start_time, end_time = working_hours
-        dt_time = dt.time()
+        dt_time = dt_local.time()  # Use local time for comparison
 
         return start_time <= dt_time <= end_time
+
+    def reset_manual_closure_if_needed(self, producer):
+        """
+        Автоматически сбрасывает ручное закрытие, если наступил новый день.
+
+        Returns:
+            bool: True если сброс произошел, False если сброс не требовался
+        """
+        if not producer.manual_closed_date:
+            return False
+
+        # Use local timezone for date comparison
+        from django.conf import settings
+        import pytz
+        local_tz = pytz.timezone(settings.TIME_ZONE)
+        today = timezone.now().astimezone(local_tz).date()
+
+        if producer.manual_closed_date < today:
+            producer.is_hidden = False
+            producer.manual_closed_date = None
+            producer.save(update_fields=['is_hidden', 'manual_closed_date'])
+            return True
+
+        return False
+
+    def is_within_working_hours(self, producer, now=None):
+        """
+        Проверяет, находится ли указанное время в рабочих часах магазина
+        (игнорирует ручное закрытие, только расписание).
+
+        Args:
+            producer: Экземпляр Producer
+            now: datetime, если None - используется текущее время
+
+        Returns:
+            bool: True если в рабочих часах, False если вне
+        """
+        if now is None:
+            now = timezone.now()
+
+        # Используем существующий метод _is_time_in_working_hours
+        return self._is_time_in_working_hours(producer, now)
+
+    def is_store_open_now(self, producer, now=None):
+        """
+        Проверяет, открыт ли магазин для приема новых заказов.
+        Учитывает и расписание, и ручное закрытие.
+
+        Returns:
+            tuple: (is_open: bool, closure_reason: str|None)
+            closure_reason: "SCHEDULE" | "MANUAL" | "ARCHIVED" | None
+        """
+        if now is None:
+            now = timezone.now()
+
+        # 1. Автосброс ручного закрытия при смене даты
+        self.reset_manual_closure_if_needed(producer)
+
+        # 2. Проверка по расписанию
+        if not self.is_within_working_hours(producer, now):
+            return False, "SCHEDULE"
+
+        # 3. Проверка ручного закрытия
+        # Use local timezone for date comparison
+        from django.conf import settings
+        import pytz
+        local_tz = pytz.timezone(settings.TIME_ZONE)
+        today = now.astimezone(local_tz).date()
+
+        if producer.is_hidden and producer.manual_closed_date == today:
+            return False, "MANUAL"
+
+        # Если is_hidden=True но manual_closed_date=None - это постоянная архивация
+        if producer.is_hidden and not producer.manual_closed_date:
+            return False, "ARCHIVED"
+
+        return True, None
+
+    def get_next_open_datetime(self, producer, from_datetime=None):
+        """
+        Вычисляет следующее время открытия магазина.
+
+        Args:
+            producer: Экземпляр Producer
+            from_datetime: datetime, от которого искать (если None - текущее время)
+
+        Returns:
+            datetime|None: Следующее время открытия или None если расписание не настроено
+        """
+        if from_datetime is None:
+            from_datetime = timezone.now()
+
+        # Use local timezone for date comparison
+        from django.conf import settings
+        import pytz
+        local_tz = pytz.timezone(settings.TIME_ZONE)
+
+        from_datetime_local = from_datetime.astimezone(local_tz)
+        today = from_datetime_local.date()
+
+        if producer.manual_closed_date == today:
+            # Ищем время открытия следующего рабочего дня
+            search_date = today + timedelta(days=1)
+        else:
+            search_date = today
+
+        # Ищем следующий рабочий день в течение следующих 7 дней
+        for i in range(7):
+            check_date = search_date + timedelta(days=i)
+            working_hours = self._get_working_hours_for_date(producer, check_date)
+
+            if working_hours:
+                start_time, end_time = working_hours
+
+                # Создаем datetime для начала рабочего дня в локальном timezone
+                next_open_naive = datetime.combine(check_date, start_time)
+                next_open = local_tz.localize(next_open_naive)
+
+                # Если это сегодня и время еще не прошло
+                if check_date == today and from_datetime_local.time() < start_time:
+                    return next_open
+
+                # Если это будущий день
+                if check_date > today:
+                    return next_open
+
+        # Расписание не настроено или нет рабочих дней
+        return None

@@ -19,6 +19,13 @@ export default async function Page(
 
   let producer: Producer | null = null;
   let isOwner = false;
+  let storeStatus: {
+    is_within_working_hours: boolean;
+    is_store_open_now: boolean;
+    closure_reason: 'MANUAL' | 'SCHEDULE' | 'ARCHIVED' | null;
+    next_open_at: string | null;
+    current_working_hours: { start: string; end: string } | null;
+  } | null = null;
 
   try {
     producer = await getProducerById(id);
@@ -29,6 +36,20 @@ export default async function Page(
       } catch (e) {
         // Not logged in or error getting profile
       }
+    }
+
+    // Fetch store status
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/producers/${id}/store_status/`, {
+        cache: 'no-store' // Always fetch fresh status
+      });
+      if (response.ok) {
+        storeStatus = await response.json();
+      }
+    } catch (e) {
+      // Store status fetch failed
+      storeStatus = null;
     }
   } catch {
     producer = null;
@@ -59,33 +80,14 @@ export default async function Page(
   const dishesResponse = await getDishes({ producer: id, is_available: true }).catch(() => ({ results: [], count: 0 }));
   const dishes: Dish[] = dishesResponse?.results || [];
 
-  const avgRating = reviews.length > 0 
-    ? reviews.reduce((acc, r) => acc + (r.rating_taste + r.rating_appearance + r.rating_service) / 3, 0) / reviews.length 
+  const avgRating = reviews.length > 0
+    ? reviews.reduce((acc, r) => acc + (r.rating_taste + r.rating_appearance + r.rating_service) / 3, 0) / reviews.length
     : producer.rating;
 
-  // Get current day's schedule
-  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const todayKey = days[new Date().getDay()];
-  const todaySchedule = producer.weekly_schedule?.find(d => d.day === todayKey);
-  
-  const isOpenNow = () => {
-    if (!todaySchedule) return false;
-    if (todaySchedule.is_247) return true;
-    if (!todaySchedule.intervals || todaySchedule.intervals.length === 0) return false;
-    
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    
-    return todaySchedule.intervals.some(interval => {
-      const [startH, startM] = interval.start.split(':').map(Number);
-      const [endH, endM] = interval.end.split(':').map(Number);
-      const startMinutes = startH * 60 + startM;
-      const endMinutes = endH * 60 + endM;
-      return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
-    });
-  };
-
-  const status = isOpenNow();
+  // Use server-side store status
+  const isOpenForOrders = storeStatus?.is_store_open_now ?? false;
+  const closureReason = storeStatus?.closure_reason;
+  const nextOpenAt = storeStatus?.next_open_at;
 
   let categories: Category[] = [];
   try {
@@ -112,11 +114,18 @@ export default async function Page(
           <div className="flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl md:text-4xl font-bold text-[#4b2f23]">{producer.name}</h1>
-              <div className="flex gap-2">
-                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${status ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                  {status ? 'Открыто' : 'Закрыто'}
+              <div className="flex gap-2 items-center">
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isOpenForOrders ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                  {isOpenForOrders ? 'Открыто' : 'Закрыто'}
                 </span>
-                {producer.is_hidden && (
+                {!isOpenForOrders && closureReason && (
+                  <span className="text-[10px] text-gray-500">
+                    {closureReason === 'MANUAL' && '(Временно закрыт)'}
+                    {closureReason === 'SCHEDULE' && '(По расписанию)'}
+                    {closureReason === 'ARCHIVED' && '(Недоступен)'}
+                  </span>
+                )}
+                {producer.is_hidden && isOwner && (
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-600">
                     Скрыт от покупателей
                   </span>
@@ -128,6 +137,16 @@ export default async function Page(
                 )}
               </div>
             </div>
+            {!isOpenForOrders && nextOpenAt && (
+              <p className="text-sm text-gray-600">
+                Откроется: {new Date(nextOpenAt).toLocaleString('ru-RU', {
+                  day: 'numeric',
+                  month: 'long',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#7c6b62]">
               <div className="flex items-center gap-1">
                 <span className="text-yellow-500 text-lg">★</span>

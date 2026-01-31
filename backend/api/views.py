@@ -1393,6 +1393,52 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
         producer = dish.producer
 
+        # ========== ПРОВЕРКА ОТКРЫТОСТИ МАГАЗИНА ==========
+        from api.services.scheduling_service import SchedulingService
+
+        scheduling_service = SchedulingService()
+
+        # Получаем запрошенное время доставки (если указано)
+        scheduled_time_str = self.request.data.get("scheduled_delivery_time")
+        check_time = now
+
+        if scheduled_time_str:
+            # Если заказ на будущее - проверяем, будет ли магазин открыт ТОГДА
+            from dateutil import parser
+            try:
+                scheduled_delivery_time_check = parser.isoparse(scheduled_time_str)
+                if timezone.is_naive(scheduled_delivery_time_check):
+                    scheduled_delivery_time_check = timezone.make_aware(scheduled_delivery_time_check)
+                check_time = scheduled_delivery_time_check
+            except (ValueError, TypeError):
+                # Если не удалось распарсить - проверяем текущий статус
+                check_time = now
+
+        # Проверяем открытость магазина в нужное время
+        is_open, closure_reason = scheduling_service.is_store_open_now(producer, check_time)
+
+        if not is_open:
+            next_open = scheduling_service.get_next_open_datetime(producer, now)
+
+            if closure_reason == "MANUAL":
+                error_msg = "Магазин временно закрыт продавцом."
+            elif closure_reason == "SCHEDULE":
+                error_msg = "Магазин сейчас закрыт по расписанию."
+            elif closure_reason == "ARCHIVED":
+                error_msg = "Магазин недоступен."
+            else:
+                error_msg = "Магазин закрыт."
+
+            if next_open:
+                error_msg += f" Следующее открытие: {next_open.strftime('%d.%m в %H:%M')}"
+
+            raise serializers.ValidationError({
+                "detail": error_msg,
+                "closure_reason": closure_reason,
+                "next_open_at": next_open.isoformat() if next_open else None
+            })
+        # ========== КОНЕЦ ПРОВЕРКИ ОТКРЫТОСТИ МАГАЗИНА ==========
+
         if is_gift:
             deadline = None
         else:
@@ -2976,6 +3022,107 @@ def _normalize_delivery_pricing_rules(value):
     return normalized
 
 
+def _normalize_delivery_zones(value):
+    """Нормализация delivery_zones."""
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError("delivery_zones должен быть массивом")
+
+    normalized = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+
+        # radius_km - обязательное поле
+        radius_km = _parse_float(item.get("radius_km"))
+        if radius_km is None or radius_km <= 0:
+            continue
+
+        zone = {"radius_km": radius_km}
+
+        # Необязательные поля
+        if "zone_id" in item:
+            zone["zone_id"] = str(item.get("zone_id") or "").strip()
+
+        if "name" in item:
+            zone["name"] = str(item.get("name") or "").strip()
+
+        if "time_minutes" in item:
+            time_minutes = _parse_int(item.get("time_minutes"))
+            if time_minutes is not None and time_minutes > 0:
+                zone["time_minutes"] = time_minutes
+
+        if "price" in item:
+            price = _parse_float(item.get("price"))
+            if price is not None and price >= 0:
+                zone["price"] = price
+
+        # Добавляем старые поля для обратной совместимости
+        if "price_to_building" in item:
+            price_to_building = _parse_float(item.get("price_to_building"))
+            if price_to_building is not None and price_to_building >= 0:
+                zone["price_to_building"] = price_to_building
+
+        if "price_to_door" in item:
+            price_to_door = _parse_float(item.get("price_to_door"))
+            if price_to_door is not None and price_to_door >= 0:
+                zone["price_to_door"] = price_to_door
+
+        normalized.append(zone)
+        if len(normalized) >= 10:  # Лимит на количество зон
+            break
+
+    return normalized
+
+
+def _normalize_weekly_schedule(value):
+    """Нормализация weekly_schedule."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"[DEBUG] _normalize_weekly_schedule called with value: {value}")
+
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError("weekly_schedule должен быть массивом")
+
+    normalized = []
+    valid_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+
+        day = str(item.get("day") or "").strip()
+        if day not in valid_days:
+            continue
+
+        # Проверяем is_closed
+        is_closed = _parse_bool(item.get("is_closed"))
+        if is_closed:
+            normalized.append({"day": day, "is_closed": True})
+            continue
+
+        # Если не закрыт, нужны start и end
+        start = str(item.get("start") or "").strip()
+        end = str(item.get("end") or "").strip()
+
+        # Валидация формата HH:MM
+        if _parse_hhmm_to_minutes(start) is None or _parse_hhmm_to_minutes(end) is None:
+            continue
+
+        schedule_item = {
+            "day": day,
+            "start": start,
+            "end": end,
+            "is_closed": False
+        }
+
+        normalized.append(schedule_item)
+
+    logger.info(f"[DEBUG] _normalize_weekly_schedule returning: {normalized}")
+    return normalized
 
 
 class ProfileView(APIView):
@@ -2987,186 +3134,218 @@ class ProfileView(APIView):
         return Response(serializer.data)
 
     def patch(self, request):
-        user = request.user
-        data = request.data
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
 
-        if "first_name" in data:
-            user.first_name = data["first_name"]
-        if "last_name" in data:
-            user.last_name = data["last_name"]
+        try:
+            user = request.user
+            data = request.data
 
-        producer = getattr(user, "producer", None)
-        if producer:
-            producer_changed = False
+            if "first_name" in data:
+                user.first_name = data["first_name"]
+            if "last_name" in data:
+                user.last_name = data["last_name"]
 
-            if "shop_name" in data:
-                new_name = str(data.get("shop_name") or "").strip()
-                if new_name and new_name != producer.name:
-                    moderation = moderate_shop_name(new_name)
-                    if not moderation.get("approved"):
-                        return Response(
-                            {"detail": "Название магазина не прошло модерацию"},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-                    producer.name = new_name
+            producer = getattr(user, "producer", None)
+            if producer:
+                producer_changed = False
+
+                if "shop_name" in data:
+                    new_name = str(data.get("shop_name") or "").strip()
+                    if new_name and new_name != producer.name:
+                        moderation = moderate_shop_name(new_name)
+                        if not moderation.get("approved"):
+                            return Response(
+                                {"detail": "Название магазина не прошло модерацию"},
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
+                        producer.name = new_name
+                        producer_changed = True
+
+                if "city" in data:
+                    producer.city = str(data.get("city") or "").strip()
                     producer_changed = True
 
-            if "city" in data:
-                producer.city = str(data.get("city") or "").strip()
-                producer_changed = True
+                if "address" in data:
+                    producer.address = str(data.get("address") or "").strip()
+                    producer_changed = True
 
-            if "address" in data:
-                producer.address = str(data.get("address") or "").strip()
-                producer_changed = True
+                if "latitude" in data:
+                    producer.latitude = data.get("latitude") or None
+                    producer_changed = True
 
-            if "latitude" in data:
-                producer.latitude = data.get("latitude") or None
-                producer_changed = True
+                if "longitude" in data:
+                    producer.longitude = data.get("longitude") or None
+                    producer_changed = True
 
-            if "longitude" in data:
-                producer.longitude = data.get("longitude") or None
-                producer_changed = True
+                if "opening_time" in data:
+                    producer.opening_time = data.get("opening_time")
+                    producer_changed = True
 
-            if "opening_time" in data:
-                producer.opening_time = data.get("opening_time")
-                producer_changed = True
+                if "closing_time" in data:
+                    producer.closing_time = data.get("closing_time")
+                    producer_changed = True
 
-            if "closing_time" in data:
-                producer.closing_time = data.get("closing_time")
-                producer_changed = True
+                if "short_description" in data:
+                    producer.short_description = str(data.get("short_description") or "")
+                    producer_changed = True
 
-            if "short_description" in data:
-                producer.short_description = str(data.get("short_description") or "")
-                producer_changed = True
+                if "description" in data:
+                    producer.description = str(data.get("description") or "")
+                    producer_changed = True
 
-            if "description" in data:
-                producer.description = str(data.get("description") or "")
-                producer_changed = True
+                if "logo_url" in data:
+                    producer.logo_url = str(data.get("logo_url") or "").strip()
+                    producer_changed = True
 
-            if "logo_url" in data:
-                producer.logo_url = str(data.get("logo_url") or "").strip()
-                producer_changed = True
+                if "main_category" in data:
+                    cat_id = data.get("main_category")
+                    if not cat_id:
+                        producer.main_category = None
+                    else:
+                        try:
+                            producer.main_category = Category.objects.get(id=cat_id)
+                        except (Category.DoesNotExist, ValidationError, ValueError):
+                            return Response(
+                                {"detail": "Категория не найдена"},
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
+                    producer_changed = True
 
-            if "main_category" in data:
-                cat_id = data.get("main_category")
-                if not cat_id:
-                    producer.main_category = None
-                else:
+                if "is_hidden" in data:
+                    parsed = _parse_bool(data.get("is_hidden"))
+                    if parsed is not None:
+                        producer.is_hidden = bool(parsed)
+                        producer_changed = True
+
+                if "delivery_radius_km" in data:
+                    v = _parse_float(data.get("delivery_radius_km"))
+                    if v is not None and v > 0:
+                        producer.delivery_radius_km = v
+                        producer_changed = True
+
+                if "delivery_price_to_building" in data:
+                    v = _parse_float(data.get("delivery_price_to_building"))
+                    if v is not None and v >= 0:
+                        producer.delivery_price_to_building = v
+                        producer_changed = True
+
+                if "delivery_price_to_door" in data:
+                    v = _parse_float(data.get("delivery_price_to_door"))
+                    if v is not None and v >= 0:
+                        producer.delivery_price_to_door = v
+                        producer_changed = True
+
+                if "delivery_time_minutes" in data:
+                    v = _parse_int(data.get("delivery_time_minutes"))
+                    if v is not None and v > 0:
+                        producer.delivery_time_minutes = v
+                        producer_changed = True
+
+                if "delivery_pricing_rules" in data:
                     try:
-                        producer.main_category = Category.objects.get(id=cat_id)
-                    except (Category.DoesNotExist, ValidationError, ValueError):
+                        normalized = _normalize_delivery_pricing_rules(
+                            data.get("delivery_pricing_rules")
+                        )
+                    except ValueError as e:
                         return Response(
-                            {"detail": "Категория не найдена"},
-                            status=status.HTTP_400_BAD_REQUEST,
+                            {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
                         )
-                producer_changed = True
+                    if normalized is not None:
+                        producer.delivery_pricing_rules = normalized
+                        producer_changed = True
 
-            if "is_hidden" in data:
-                parsed = _parse_bool(data.get("is_hidden"))
-                if parsed is not None:
-                    producer.is_hidden = bool(parsed)
-                    producer_changed = True
-
-            if "delivery_radius_km" in data:
-                v = _parse_float(data.get("delivery_radius_km"))
-                if v is not None and v > 0:
-                    producer.delivery_radius_km = v
-                    producer_changed = True
-
-            if "delivery_price_to_building" in data:
-                v = _parse_float(data.get("delivery_price_to_building"))
-                if v is not None and v >= 0:
-                    producer.delivery_price_to_building = v
-                    producer_changed = True
-
-            if "delivery_price_to_door" in data:
-                v = _parse_float(data.get("delivery_price_to_door"))
-                if v is not None and v >= 0:
-                    producer.delivery_price_to_door = v
-                    producer_changed = True
-
-            if "delivery_time_minutes" in data:
-                v = _parse_int(data.get("delivery_time_minutes"))
-                if v is not None and v > 0:
-                    producer.delivery_time_minutes = v
-                    producer_changed = True
-
-            if "delivery_pricing_rules" in data:
-                try:
-                    normalized = _normalize_delivery_pricing_rules(
-                        data.get("delivery_pricing_rules")
-                    )
-                except ValueError as e:
-                    return Response(
-                        {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
-                    )
-                if normalized is not None:
-                    producer.delivery_pricing_rules = normalized
-                    producer_changed = True
-
-            if "delivery_zones" in data:
-                try:
-                    normalized = _normalize_delivery_zones(data.get("delivery_zones"))
-                except ValueError as e:
-                    return Response(
-                        {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
-                    )
-                if normalized is not None:
-                    producer.delivery_zones = normalized
-                    if len(normalized) > 0:
-                        first = normalized[0]
-                        producer.delivery_radius_km = first.get(
-                            "radius_km", producer.delivery_radius_km
+                if "delivery_zones" in data:
+                    try:
+                        normalized = _normalize_delivery_zones(data.get("delivery_zones"))
+                    except ValueError as e:
+                        return Response(
+                            {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
                         )
-                        producer.delivery_price_to_building = first.get(
-                            "price_to_building", producer.delivery_price_to_building
+                    if normalized is not None:
+                        producer.delivery_zones = normalized
+                        if len(normalized) > 0:
+                            first = normalized[0]
+                            producer.delivery_radius_km = first.get(
+                                "radius_km", producer.delivery_radius_km
+                            )
+                            producer.delivery_price_to_building = first.get(
+                                "price_to_building", producer.delivery_price_to_building
+                            )
+                            producer.delivery_price_to_door = first.get(
+                                "price_to_door", producer.delivery_price_to_door
+                            )
+                            producer.delivery_time_minutes = first.get(
+                                "time_minutes", producer.delivery_time_minutes
+                            )
+                        producer_changed = True
+
+                if "pickup_enabled" in data:
+                    parsed = _parse_bool(data.get("pickup_enabled"))
+                    if parsed is not None:
+                        producer.pickup_enabled = bool(parsed)
+                        producer_changed = True
+
+                if "max_orders_per_slot" in data:
+                    v = _parse_int(data.get("max_orders_per_slot"))
+                    if v is not None and v >= 0:
+                        producer.max_orders_per_slot = v
+                        producer_changed = True
+
+                if "weekly_schedule" in data:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"[DEBUG] Saving weekly_schedule, raw data: {data.get('weekly_schedule')}")
+                    try:
+                        normalized = _normalize_weekly_schedule(data.get("weekly_schedule"))
+                    except ValueError as e:
+                        return Response(
+                            {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
                         )
-                        producer.delivery_price_to_door = first.get(
-                            "price_to_door", producer.delivery_price_to_door
-                        )
-                        producer.delivery_time_minutes = first.get(
-                            "time_minutes", producer.delivery_time_minutes
-                        )
+                    if normalized is not None:
+                        logger.info(f"[DEBUG] Setting producer.weekly_schedule to: {normalized}")
+                        producer.weekly_schedule = normalized
+                        # Explicitly save weekly_schedule to ensure Django detects the change
+                        producer.save(update_fields=['weekly_schedule'])
+                        logger.info(f"[DEBUG] weekly_schedule saved explicitly")
+                        producer_changed = False  # Already saved, don't save again
+                    else:
+                        logger.warning(f"[DEBUG] normalized is None, not saving")
+
+                if "requisites" in data:
+                    producer.requisites = data.get("requisites")
                     producer_changed = True
 
-            if "pickup_enabled" in data:
-                parsed = _parse_bool(data.get("pickup_enabled"))
-                if parsed is not None:
-                    producer.pickup_enabled = bool(parsed)
+                if "employees" in data:
+                    producer.employees = data.get("employees")
                     producer_changed = True
 
-            if "weekly_schedule" in data:
-                try:
-                    normalized = _normalize_weekly_schedule(data.get("weekly_schedule"))
-                except ValueError as e:
-                    return Response(
-                        {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
-                    )
-                if normalized is not None:
-                    producer.weekly_schedule = normalized
+                if "documents" in data:
+                    producer.documents = data.get("documents")
                     producer_changed = True
 
-            if "requisites" in data:
-                producer.requisites = data.get("requisites")
-                producer_changed = True
+                if producer_changed:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"[DEBUG] Saving producer with weekly_schedule: {producer.weekly_schedule}")
+                    producer.save()
+                    logger.info(f"[DEBUG] Producer saved successfully")
 
-            if "employees" in data:
-                producer.employees = data.get("employees")
-                producer_changed = True
+            user.save()
 
-            if "documents" in data:
-                producer.documents = data.get("documents")
-                producer_changed = True
+            # Return updated profile
+            profile, _ = Profile.objects.get_or_create(user=user)
+            serializer = ProfileSerializer(profile, context={"request": request})
+            return Response(serializer.data)
 
-            if producer_changed:
-                producer.save()
-
-        user.save()
-
-        # Return updated profile
-        profile, _ = Profile.objects.get_or_create(user=user)
-        serializer = ProfileSerializer(profile, context={"request": request})
-        return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error in ProfileView.patch: {str(e)}")
+            logger.error(traceback.format_exc())
+            return Response(
+                {"detail": f"Internal server error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class EmailLoginView(APIView):

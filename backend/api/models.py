@@ -64,7 +64,12 @@ class Producer(models.Model):
     )
 
     # Status & Schedule
-    is_hidden = models.BooleanField(default=False)  # Archive/Hide from list
+    is_hidden = models.BooleanField(default=False)  # Временное закрытие (если manual_closed_date) или постоянная архивация
+    manual_closed_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Дата ручного закрытия магазина (для автосброса)"
+    )
     # Simple JSON/Text for breaks. E.g. "Sat-Sun off, Lunch 13-14"
     schedule_description = models.TextField(
         blank=True, help_text="Text description of breaks/weekends"

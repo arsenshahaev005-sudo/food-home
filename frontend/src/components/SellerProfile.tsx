@@ -21,6 +21,14 @@ interface SellerProfileProps {
 type ProfileSubTab = 'ABOUT' | 'DELIVERY' | 'EMPLOYEES' | 'REQUISITES' | 'DOCUMENTS' | 'FTS';
 type AboutSection = 'GENERAL' | 'CONTACTS' | 'WORKING_MODE';
 
+interface StoreStatus {
+  is_within_working_hours: boolean;
+  is_store_open_now: boolean;
+  closure_reason: 'MANUAL' | 'SCHEDULE' | 'ARCHIVED' | null;
+  next_open_at: string | null;
+  current_working_hours: { start: string; end: string } | null;
+}
+
 // Helper to get cookie value
 function getCookie(name: string) {
   if (typeof document === "undefined") return "";
@@ -51,15 +59,47 @@ function normalizeWeeklySchedule(value: unknown): WeeklyScheduleDay[] {
   for (const item of value) {
     if (!item || typeof item !== 'object') continue;
     const dayRaw = (item as any).day;
-    const is247Raw = (item as any).is_247;
+
+    // Нормализуем день к нижнему регистру для совместимости с backend
+    const dayNormalized = (typeof dayRaw === 'string' ? dayRaw.toLowerCase() : dayRaw) as WeekDayKey;
+
+    if (!WEEK_DAYS.some((d) => d.key === dayNormalized)) continue;
+
+    // Backend возвращает формат: {day, start, end, is_closed}
+    // Frontend использует формат: {day, is_247, intervals: [{start, end}]}
+    const is_closed = (item as any).is_closed;
+    const start = (item as any).start;
+    const end = (item as any).end;
+
+    // Если день закрыт
+    if (is_closed === true) {
+      map.set(dayNormalized, { day: dayNormalized, is_247: false, intervals: [] });
+      continue;
+    }
+
+    // Если есть start/end (старый формат backend)
+    if (start && end) {
+      // Проверяем на круглосуточный режим
+      const is247 = start === "00:00" && end === "23:59";
+      map.set(dayNormalized, {
+        day: dayNormalized,
+        is_247: is247,
+        intervals: is247 ? [] : [{ start: String(start), end: String(end) }]
+      });
+      continue;
+    }
+
+    // Если есть intervals (новый формат)
     const intervalsRaw = (item as any).intervals;
-    if (!WEEK_DAYS.some((d) => d.key === dayRaw)) continue;
-    const intervals = Array.isArray(intervalsRaw)
-      ? intervalsRaw
-          .filter((x: any) => x && typeof x === 'object')
-          .map((x: any) => ({ start: String(x.start || ''), end: String(x.end || '') }))
-      : [];
-    map.set(dayRaw, { day: dayRaw, is_247: Boolean(is247Raw), intervals });
+    const is247Raw = (item as any).is_247;
+    if (Array.isArray(intervalsRaw) || is247Raw !== undefined) {
+      const intervals = Array.isArray(intervalsRaw)
+        ? intervalsRaw
+            .filter((x: any) => x && typeof x === 'object')
+            .map((x: any) => ({ start: String(x.start || ''), end: String(x.end || '') }))
+        : [];
+      map.set(dayNormalized, { day: dayNormalized, is_247: Boolean(is247Raw), intervals });
+    }
   }
 
   return defaults.map((d) => map.get(d.day) || d);
@@ -181,6 +221,7 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
   );
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [shopStateSaving, setShopStateSaving] = useState(false);
+  const [storeStatus, setStoreStatus] = useState<StoreStatus | null>(null);
   const [deliveryZonesForm, setDeliveryZonesForm] = useState<DeliveryZone[]>(
     normalizeDeliveryZones((initialProfile as any).delivery_zones, initialProfile)
   );
@@ -189,6 +230,9 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
   );
   const [deliverySaving, setDeliverySaving] = useState(false);
   const [pickupSaving, setPickupSaving] = useState(false);
+  const [maxOrdersPerSlot, setMaxOrdersPerSlot] = useState<number>(
+    toNumber((initialProfile as any).max_orders_per_slot, 0)
+  );
 
   // Requisites and Employees States
   const [requisitesForm, setRequisitesForm] = useState<any>(
@@ -225,6 +269,11 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
   const [logoUploading, setLogoUploading] = useState(false);
 
   useEffect(() => {
+    // Sync max_orders_per_slot with profile changes
+    setMaxOrdersPerSlot(toNumber((profile as any).max_orders_per_slot, 0));
+  }, [profile]);
+
+  useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
     if (resendCooldown > 0) {
       timer = setInterval(() => {
@@ -245,6 +294,42 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
       })
       .catch(() => setCategories([]));
   }, []);
+
+  // Fetch store status
+  const fetchStoreStatus = async () => {
+    const producerId = (profile as any).producer_id;
+    if (!producerId) return;
+
+    const token = getCookie("accessToken");
+    if (!token) return;
+
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/producers/${producerId}/store_status/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const status = await response.json();
+        setStoreStatus(status);
+      }
+    } catch (e) {
+      console.error("Failed to fetch store status:", e);
+    }
+  };
+
+  // Auto-update store status every minute
+  useEffect(() => {
+    fetchStoreStatus();
+    const interval = setInterval(fetchStoreStatus, 60000);
+    return () => clearInterval(interval);
+  }, [(profile as any).producer_id]);
 
   const handleError = (e: any, defaultMsg: string) => {
       let msg = defaultMsg;
@@ -291,46 +376,124 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
     const token = getCookie("accessToken");
     if (!token) return;
 
-    const normalized = normalizeWeeklySchedule(weeklyScheduleForm).map((d) => {
-      if (d.is_247) return { ...d, intervals: [] };
-      const intervals = (d.intervals || [])
-        .map((x) => ({ start: String(x.start || ''), end: String(x.end || '') }))
-        .filter((x) => timeToMinutes(x.start) !== null && timeToMinutes(x.end) !== null)
-        .filter((x) => (timeToMinutes(x.end) as number) > (timeToMinutes(x.start) as number));
-      return { ...d, intervals };
-    });
+    // Конвертируем дни в формат backend (с заглавной буквы)
+    const dayMapping: Record<string, string> = {
+      'monday': 'Monday',
+      'tuesday': 'Tuesday',
+      'wednesday': 'Wednesday',
+      'thursday': 'Thursday',
+      'friday': 'Friday',
+      'saturday': 'Saturday',
+      'sunday': 'Sunday'
+    };
+
+    // Backend ожидает формат: {day, start, end, is_closed} (БЕЗ intervals)
+    const normalized = normalizeWeeklySchedule(weeklyScheduleForm)
+      .map((d) => {
+        const backendDay = dayMapping[d.day] || d.day;
+
+        // Если круглосуточно
+        if (d.is_247) {
+          return { day: backendDay, start: "00:00", end: "23:59", is_closed: false };
+        }
+
+        // Фильтруем валидные интервалы
+        const validIntervals = (d.intervals || [])
+          .map((x) => ({ start: String(x.start || ''), end: String(x.end || '') }))
+          .filter((x) => timeToMinutes(x.start) !== null && timeToMinutes(x.end) !== null)
+          .filter((x) => (timeToMinutes(x.end) as number) > (timeToMinutes(x.start) as number));
+
+        // Если нет интервалов - день закрыт
+        if (validIntervals.length === 0) {
+          return { day: backendDay, is_closed: true };
+        }
+
+        // Берем первый интервал (backend поддерживает только один интервал на день)
+        const firstInterval = validIntervals[0];
+        return {
+          day: backendDay,
+          start: firstInterval.start,
+          end: firstInterval.end,
+          is_closed: false
+        };
+      })
+      .filter(d => d !== null); // Убираем null записи
+
+    console.log('[DEBUG] weeklyScheduleForm before normalize:', weeklyScheduleForm);
+    console.log('[DEBUG] normalized schedule to send:', normalized);
 
     try {
       setScheduleSaving(true);
-      const updated = await updateProfile({ weekly_schedule: normalized } as any, token);
+      const updated = await updateProfile({ weekly_schedule: normalized } as any);
+      console.log('[DEBUG] Server response:', updated);
       setProfile(updated);
       setWeeklyScheduleForm(normalizeWeeklySchedule((updated as any).weekly_schedule));
       onProfileUpdated?.(updated);
       alert("Режим работы сохранен");
     } catch (e) {
+      console.error('[DEBUG] Save error:', e);
       handleError(e, "Ошибка сохранения");
     } finally {
       setScheduleSaving(false);
     }
   };
 
-  const handleToggleShopHidden = async () => {
+  const handleToggleStore = async () => {
     if (shopStateSaving) return;
+
+    const producerId = (profile as any).producer_id;
+    if (!producerId) return;
+
     const token = getCookie("accessToken");
     if (!token) return;
 
-    const nextHidden = !(profile as any).is_hidden;
-    if (nextHidden) {
-      if (!confirm("Закрыть магазин? Он перестанет отображаться в списке продавцов.")) return;
+    const isCurrentlyOpen = storeStatus?.is_store_open_now;
+    const endpoint = isCurrentlyOpen ? "close_store" : "open_store";
+
+    // Предупреждение при попытке открыть вне рабочих часов
+    if (!isCurrentlyOpen && !storeStatus?.is_within_working_hours) {
+      alert("Нельзя открыть магазин вне рабочих часов. Пожалуйста, измените расписание работы.");
+      return;
     }
+
+    // Подтверждение при закрытии
+    if (isCurrentlyOpen) {
+      if (!confirm("Закрыть магазин на сегодня? Покупатели не смогут оформить новые заказы до следующего рабочего дня.")) {
+        return;
+      }
+    }
+
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
     try {
       setShopStateSaving(true);
-      const updated = await updateProfile({ is_hidden: nextHidden } as any, token);
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/producers/${producerId}/${endpoint}/`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Ошибка изменения статуса");
+      }
+
+      // Обновляем статус
+      const newStatus = await response.json();
+      setStoreStatus(newStatus);
+
+      // Обновляем профиль для синхронизации is_hidden
+      const updated = await updateProfile({} as any, token); // Fetch fresh profile
       setProfile(updated);
       onProfileUpdated?.(updated);
-    } catch (e) {
-      handleError(e, "Ошибка обновления статуса магазина");
+
+    } catch (e: any) {
+      alert(e.message || "Ошибка обновления статуса магазина");
     } finally {
       setShopStateSaving(false);
     }
@@ -1234,12 +1397,17 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
                           try {
                             setDeliverySaving(true);
                             const updated = await updateProfile(
-                              { delivery_zones: normalizedZones, delivery_pricing_rules: normalizedRules } as any,
+                              {
+                                delivery_zones: normalizedZones,
+                                delivery_pricing_rules: normalizedRules,
+                                max_orders_per_slot: Math.max(0, Math.floor(maxOrdersPerSlot))
+                              } as any,
                               token
                             );
                             setProfile(updated);
                             setDeliveryZonesForm(normalizeDeliveryZones((updated as any).delivery_zones, updated));
                             setDeliveryPricingRulesForm(normalizeDeliveryPricingRules((updated as any).delivery_pricing_rules));
+                            setMaxOrdersPerSlot(toNumber((updated as any).max_orders_per_slot, 0));
                             onProfileUpdated?.(updated);
                             alert("Доставка сохранена");
                           } catch (e) {
@@ -1635,6 +1803,112 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
                                 </div>
                                 <div className="text-sm font-bold text-gray-900 leading-tight">
                                     {generalForm.address || 'Адрес не указан в профиле'}
+                                </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Scheduled Orders Settings Card */}
+                        <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
+                          <div className="flex items-center gap-3 mb-4">
+                              <div className="w-10 h-10 rounded-xl bg-[#fff5f0] flex items-center justify-center text-[#c9825b]">
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                                  </svg>
+                              </div>
+                              <h4 className="text-lg font-bold text-gray-900">Запланированные заказы</h4>
+                          </div>
+
+                          <p className="text-sm text-gray-500 mb-6">
+                            Настройте ограничения для запланированных заказов. Покупатели смогут выбирать дату и время доставки.
+                          </p>
+
+                          <div className="space-y-6">
+                            {/* Max Orders Per Slot */}
+                            <div className="space-y-3">
+                                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">
+                                    Максимум заказов на временной слот
+                                </label>
+                                <div className="flex items-center gap-4 bg-gray-50/80 rounded-[1.25rem] px-6 py-4 border border-transparent focus-within:border-[#c9825b]/20 focus-within:bg-white focus-within:shadow-sm transition-all">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={maxOrdersPerSlot}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value, 10);
+                                            setMaxOrdersPerSlot(isNaN(val) ? 0 : Math.max(0, val));
+                                        }}
+                                        className="w-full bg-transparent border-none p-0 text-lg font-bold text-gray-900 focus:ring-0"
+                                        placeholder="0 = без ограничений"
+                                    />
+                                    <span className="text-gray-400 font-bold text-sm whitespace-nowrap">заказов</span>
+                                </div>
+                                <div className="flex items-start gap-2 ml-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-[#c9825b] mt-0.5 flex-shrink-0">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                                    </svg>
+                                    <p className="text-xs text-gray-500 leading-relaxed">
+                                        Укажите <span className="font-bold">0</span> для неограниченного количества заказов. Установите конкретное число (например, <span className="font-bold">5</span>), чтобы ограничить количество запланированных заказов на один 30-минутный временной слот.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Info Card */}
+                            <div className="bg-[#fff5f0] rounded-2xl p-5 border border-[#c9825b]/20">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-[#c9825b]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-[#c9825b]">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                        </svg>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h5 className="font-bold text-gray-900 text-sm">Как работают запланированные заказы?</h5>
+                                        <ul className="text-xs text-gray-600 space-y-1.5 leading-relaxed">
+                                            <li className="flex items-start gap-2">
+                                                <span className="text-[#c9825b] font-bold mt-0.5">•</span>
+                                                <span>Покупатели могут выбрать дату и время доставки до 7 дней вперед</span>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <span className="text-[#c9825b] font-bold mt-0.5">•</span>
+                                                <span>Временные слоты генерируются с шагом 30 минут в ваши рабочие часы</span>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <span className="text-[#c9825b] font-bold mt-0.5">•</span>
+                                                <span>Система автоматически учитывает время на приготовление блюда и доставку</span>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <span className="text-[#c9825b] font-bold mt-0.5">•</span>
+                                                <span>Лимит заказов помогает равномерно распределить нагрузку на кухню</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Current Status Display */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className={`p-4 rounded-2xl border transition-all h-full flex flex-col justify-center ${
+                                    maxOrdersPerSlot > 0
+                                        ? 'bg-[#fff5f0] border-[#c9825b]/20 text-[#c9825b]'
+                                        : 'bg-gray-50 border-gray-100 text-gray-500'
+                                }`}>
+                                    <div className="flex items-center gap-2 font-bold text-sm">
+                                        <div className={`w-2 h-2 rounded-full ${maxOrdersPerSlot > 0 ? 'bg-[#c9825b] animate-pulse' : 'bg-gray-400'}`} />
+                                        {maxOrdersPerSlot > 0 ? `Лимит: ${maxOrdersPerSlot} заказов на слот` : 'Без ограничений'}
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 text-gray-400">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                        </svg>
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Интервал слота</span>
+                                    </div>
+                                    <div className="text-sm font-bold text-gray-900 leading-tight">
+                                        30 минут
+                                    </div>
                                 </div>
                             </div>
                           </div>
@@ -2097,32 +2371,66 @@ export default function SellerProfile({ profile: initialProfile, onProfileUpdate
                 <h3 className="font-bold text-lg text-[#4b2f23]">Состояние магазина</h3>
                 <span
                   className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    (profile as any).is_hidden ? 'bg-gray-100 text-gray-700' : 'bg-[#fff5f0] text-[#c9825b]'
+                    storeStatus?.is_store_open_now
+                      ? 'bg-[#fff5f0] text-[#c9825b]'
+                      : 'bg-gray-100 text-gray-700'
                   }`}
                 >
-                  {(profile as any).is_hidden ? 'Закрыт' : 'Открыт'}
+                  {storeStatus?.is_store_open_now ? 'Открыт' : 'Закрыт'}
                 </span>
               </div>
 
+              {/* Предупреждение вне рабочих часов */}
+              {!storeStatus?.is_within_working_hours && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                  <p className="font-medium mb-1">Сейчас вне рабочих часов</p>
+                  {storeStatus?.next_open_at && (
+                    <p className="text-xs">
+                      Следующее открытие: {new Date(storeStatus.next_open_at).toLocaleString('ru-RU', {
+                        day: 'numeric',
+                        month: 'long',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  )}
+                  <p className="text-xs mt-2">
+                    Чтобы открыть магазин, измените расписание работы
+                  </p>
+                </div>
+              )}
+
+              {/* Информация о ручном закрытии */}
+              {storeStatus?.closure_reason === 'MANUAL' && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                  <p className="font-medium">Магазин закрыт вручную</p>
+                  <p className="text-xs mt-1">
+                    Автоматически откроется в следующий рабочий день
+                  </p>
+                </div>
+              )}
+
+              {/* Кнопка переключения */}
               <button
-                onClick={handleToggleShopHidden}
+                onClick={handleToggleStore}
                 disabled={shopStateSaving}
-                className={`w-full px-6 py-2.5 rounded-xl font-medium transition-colors disabled:opacity-60 ${
-                  (profile as any).is_hidden
-                    ? 'bg-white text-[#c9825b] border border-[#c9825b] hover:bg-[#fff5f0]'
-                    : 'bg-[#c9825b] text-white hover:bg-[#b07350]'
+                className={`w-full px-6 py-2.5 rounded-xl font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                  storeStatus?.is_store_open_now
+                    ? 'bg-[#c9825b] text-white hover:bg-[#b07350]'
+                    : 'bg-white text-[#c9825b] border-2 border-[#c9825b] hover:bg-[#fff5f0]'
                 }`}
               >
                 {shopStateSaving
                   ? 'Сохранение...'
-                  : (profile as any).is_hidden
-                    ? 'Открыть магазин'
-                    : 'Закрыть магазин'}
+                  : storeStatus?.is_store_open_now
+                    ? 'Закрыть магазин на сегодня'
+                    : 'Открыть магазин'}
               </button>
 
-              <div className="mt-4 text-sm text-gray-600">
-                <div className="text-xs text-gray-500 mb-1">Сводка по времени работы</div>
-                <div className="font-medium text-[#4b2f23]">
+              {/* Расписание работы */}
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="text-xs text-gray-500 mb-2">Расписание работы</div>
+                <div className="text-sm text-gray-700">
                   {buildScheduleSummary(((profile as any).weekly_schedule ?? weeklyScheduleForm) as WeeklyScheduleDay[]) ||
                     'Расписание не настроено'}
                 </div>
